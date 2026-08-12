@@ -52,7 +52,6 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 @media(max-width:800px){.main{padding:0 14px 30px}.topbar{min-height:150px;padding:14px 10px}.cute-decoration{display:none}.top-menu{gap:6px;overflow-x:auto;flex-wrap:nowrap;justify-content:flex-start;width:100%;padding:2px 4px 8px;scrollbar-width:none}.top-menu::-webkit-scrollbar{display:none}.top-menu button{white-space:nowrap;padding:9px 12px;font-size:13px}.page-heading{margin:20px auto}.cards{grid-template-columns:repeat(2,1fr)}.menu-grid{grid-template-columns:1fr}}
 .manager-login-box{width:min(430px,calc(100% - 32px));background:linear-gradient(180deg,#fff8fc 0%,#fff 100%);border:2px solid #ffd4e6;border-radius:30px;padding:30px;box-shadow:0 28px 80px rgba(180,95,140,.30);position:relative;overflow:hidden;animation:catPop .22s ease-out}.manager-login-box:before,.manager-login-box:after{content:"";position:absolute;width:95px;height:95px;background:#ffe6f1;border-radius:50%;top:-30px;z-index:0}.manager-login-box:before{left:-40px}.manager-login-box:after{right:-40px}.manager-lock{position:relative;z-index:2;width:78px;height:78px;margin:-7px auto 12px;border-radius:28px;background:#ffdce9;display:flex;align-items:center;justify-content:center;font-size:44px;box-shadow:0 9px 22px rgba(232,139,178,.20)}.manager-title{text-align:center;color:#d85f92;font-size:25px;font-weight:800;position:relative;z-index:2}.manager-sub{text-align:center;color:#a17f90;font-size:13px;margin:6px 0 22px;position:relative;z-index:2}.manager-login-box label{display:block;margin:10px 0 5px;font-weight:700;color:#7c5b6c}.manager-login-box input{border:2px solid #f2d5e2;border-radius:15px;padding:13px 15px;background:#fff}.manager-login-box input:focus{outline:none;border-color:#e88bb2;box-shadow:0 0 0 4px #ffeaf3}.manager-login-actions{display:flex;gap:12px;margin-top:20px}.manager-login-actions button{flex:1;padding:13px;border-radius:15px}.manager-cancel{background:#fff0f6!important;color:#c85e88!important;border:1px solid #f3cadd!important}.manager-enter{background:#e86f9f!important;color:#fff!important;box-shadow:0 8px 18px rgba(232,111,159,.22)}.manager-page-note{color:#9c7c8b;font-size:13px;margin-top:-12px;margin-bottom:18px}
 .online-mode {background: #e8f8ef; color: #2e7d32; padding: 5px 15px; border-radius: 20px; font-size: 12px; margin-left: 10px; font-weight: bold; display: inline-block;}
-.offline-mode {background: #ffecb3; color: #795548; padding: 5px 15px; border-radius: 20px; font-size: 12px; margin-left: 10px; font-weight: bold; display: none;}
 </style>
 </head>
 <body>
@@ -61,10 +60,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 <header class="topbar">
   <div class="cute-decoration left">🌸 🐾</div>
   <div class="brand-center">
-    <div class="logo">🐱 UWU Cafe<span>Manager System 
-      <span id="onlineIndicator" class="online-mode">🟢 โหมดออนไลน์ (Realtime)</span>
-      <span id="offlineIndicator" class="offline-mode">🟡 โหมดออฟไลน์</span>
-    </span></div>
+    <div class="logo">🐱 UWU Cafe<span>Manager System <span id="onlineIndicator" class="online-mode">🟢 โหมดออนไลน์ (Realtime Active)</span></span></div>
     <div class="top-menu">
       <button class="active" onclick="showPage('dashboard',this)"><span>🏠</span> Dashboard</button>
       <button onclick="showPage('orders',this)"><span>🧾</span> จัดการออเดอร์</button>
@@ -217,90 +213,95 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 // ฐานข้อมูล Supabase Online Realtime 
 // ==========================================
 window.SUPABASE_CONFIG = {
-  url: "https://vehsmnstxrdzcrsrsgzr.supabase.co", // นำ URL มาใส่ตรงนี้
-  publishableKey: "YOUR_SUPABASE_ANON_KEY"         // นำ anon key มาใส่ตรงนี้
+  url: "https://vehsmnstxrdzcrsrsgzr.supabase.co",
+  publishableKey: "sb_publishable_1ddU0deXdUTJCOOz6F52Ug_3xYtUNhP"
 };
 
-let sb = null;
-let realtimeChannel = null;
+let sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.publishableKey);
 
-if (window.SUPABASE_CONFIG.url && window.supabase && window.SUPABASE_CONFIG.url.startsWith('https://')) {
-  try {
-    sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.publishableKey);
-    
-    // ฟัง Realtime Postgres Changes โดยตรงจาก Supabase
-    realtimeChannel = sb.channel('uwu-realtime-db')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_tables' }, () => refreshAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_menus' }, () => refreshAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_orders' }, () => refreshAll())
-      .subscribe();
-      
-    document.getElementById('onlineIndicator').style.display = 'inline-block';
-    document.getElementById('offlineIndicator').style.display = 'none';
-  } catch(e) {
-    document.getElementById('onlineIndicator').style.display = 'none';
-    document.getElementById('offlineIndicator').style.display = 'inline-block';
-  }
+// ตั้งค่า Supabase Realtime Channel ฟังการเปลี่ยนแปลงตารางโดยตรง (Postgres Changes Realtime)
+const realtimeChannel = sb.channel('uwu-realtime-global')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_tables' }, () => refreshAll())
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_menus' }, () => refreshAll())
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_orders' }, () => refreshAll())
+  .subscribe();
+
+// Broadcast Backup Sync เพื่อความชัวร์ในการข้ามเบราว์เซอร์
+const syncChannel = new BroadcastChannel('uwu_cafe_realtime_sync');
+syncChannel.onmessage = () => refreshAll();
+
+function notifyRealtimeChange() {
+  syncChannel.postMessage({ timestamp: Date.now() });
 }
 
 // Data Arrays
 let tables = [], menus = [], orders = [], staff = [], completedOrders = [];
 
-// Safe DB Helper Functions
+// DB API Functions
 async function dbGet(table) {
-  if (sb) {
-    try {
-      let { data, error } = await sb.from(table).select('*').order('id');
-      if (!error && data) return data;
-    } catch(e){}
-  }
+  try {
+    let { data, error } = await sb.from(table).select('*').order('id');
+    if (!error && data) return data;
+  } catch(e) {}
   return JSON.parse(localStorage.getItem(table) || '[]');
 }
 
 async function dbInsert(table, row) {
-  if (sb) {
-    try {
-      let { data, error } = await sb.from(table).insert(row).select().single();
-      if (!error && data) { refreshAll(); return data; }
-    } catch(e){}
-  }
+  try {
+    let { data, error } = await sb.from(table).insert(row).select().single();
+    if (!error && data) {
+      notifyRealtimeChange();
+      await refreshAll();
+      return data;
+    }
+  } catch(e) {}
+  
   let arr = await dbGet(table);
   row.id = Date.now();
   arr.push(row);
   localStorage.setItem(table, JSON.stringify(arr));
-  refreshAll();
+  notifyRealtimeChange();
+  await refreshAll();
   return row;
 }
 
 async function dbUpdate(table, id, row) {
-  if (sb) {
-    try {
-      let { error } = await sb.from(table).update(row).eq('id', id);
-      if (!error) { refreshAll(); return true; }
-    } catch(e){}
-  }
+  try {
+    let { error } = await sb.from(table).update(row).eq('id', id);
+    if (!error) {
+      notifyRealtimeChange();
+      await refreshAll();
+      return true;
+    }
+  } catch(e) {}
+
   let arr = await dbGet(table);
   arr = arr.map(x => x.id === id ? { ...x, ...row } : x);
   localStorage.setItem(table, JSON.stringify(arr));
-  refreshAll();
+  notifyRealtimeChange();
+  await refreshAll();
   return true;
 }
 
 async function dbDelete(table, id) {
-  if (sb) {
-    try {
-      let { error } = await sb.from(table).delete().eq('id', id);
-      if (!error) { refreshAll(); return true; }
-    } catch(e){}
-  }
+  try {
+    let { error } = await sb.from(table).delete().eq('id', id);
+    if (!error) {
+      notifyRealtimeChange();
+      await refreshAll();
+      return true;
+    }
+  } catch(e) {}
+
   let arr = await dbGet(table);
   arr = arr.filter(x => x.id !== id);
   localStorage.setItem(table, JSON.stringify(arr));
-  refreshAll();
+  notifyRealtimeChange();
+  await refreshAll();
   return true;
 }
 
-// Data Fetch & Parse
+// Fetch & Render Data
 async function refreshAll() {
   const rawTables = await dbGet('uwu_tables');
   const rawMenus = await dbGet('uwu_menus');
