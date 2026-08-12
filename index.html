@@ -61,7 +61,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 <header class="topbar">
   <div class="cute-decoration left">🌸 🐾</div>
   <div class="brand-center">
-    <div class="logo">🐱 UWU Cafe<span>Manager System <span id="offlineIndicator" class="online-mode">🟢 เชื่อมต่อ Realtime</span></span></div>
+    <div class="logo">🐱 UWU Cafe<span>Manager System <span id="offlineIndicator" class="offline-mode">กำลังเชื่อมต่อ...</span></span></div>
     <div class="top-menu">
       <button class="active" onclick="showPage('dashboard',this)"><span>🏠</span> Dashboard</button>
       <button onclick="showPage('orders',this)"><span>🧾</span> จัดการออเดอร์</button>
@@ -207,7 +207,6 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 </div>
 
 <script>
-// 🟢 Config Supabase (เปลี่ยน Key ใหม่ให้เรียบร้อยแล้ว)
 window.SUPABASE_CONFIG = {
   url: "https://vehsmnstxrdzcrsrsgzr.supabase.co",
   publishableKey: "sb_publishable_8e5cCiVFgqLdhNYwF61dew_uTdFpXPs"
@@ -217,49 +216,45 @@ let sb = null;
 let realtimeChannel = null;
 let tables = [], menus = [], orders = [], staff = [], completedOrders = [];
 
-function setOnlineStatus(online) {
+function setOnlineStatus(online, message = '') {
   const el = document.getElementById('offlineIndicator');
   if (online) {
     el.className = 'online-mode';
     el.textContent = '🟢 เชื่อมต่อ Realtime';
+    el.style.display = 'inline-block';
   } else {
     el.className = 'offline-mode';
-    el.textContent = '🟡 โหมดออฟไลน์ (Local)';
+    el.textContent = message ? '🟡 ' + message : '🟡 โหมดออฟไลน์ (Local)';
     el.style.display = 'inline-block';
   }
 }
 
-// 🟢 ระบบ Realtime เชื่อมต่อแบบ Hybrid (Broadcast + Postgres Changes)
 if (window.SUPABASE_CONFIG.url && window.supabase) {
   try {
     sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.publishableKey);
 
-    realtimeChannel = sb.channel('uwu-room', {
-      config: { broadcast: { self: true } }
-    })
+    // ลบ broadcast ออก เพื่อป้องกัน Channel Error ถ้าไม่ได้เปิดสิทธิ์ไว้ 
+    // และใช้แค่ postgres_changes สำหรับรับรู้การเปลี่ยนแปลงจากฐานข้อมูลโดยตรง
+    realtimeChannel = sb.channel('public-db')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_tables' }, () => refreshAll())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_menus' }, () => refreshAll())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_orders' }, () => refreshAll())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_staff' }, () => refreshAll())
-    .on('broadcast', { event: 'sync_data' }, () => refreshAll())
-    .subscribe((status) => {
-      setOnlineStatus(status === 'SUBSCRIBED');
+    .subscribe((status, err) => {
+      console.log("Realtime Status:", status, err);
+      if (status === 'SUBSCRIBED') {
+        setOnlineStatus(true);
+      } else if (status === 'CHANNEL_ERROR') {
+        // หาก Websocket เชื่อมไม่ได้ เบราว์เซอร์หรือการตั้งค่าอาจบล็อก
+        console.error("เชื่อมต่อแบบเรียลไทม์ไม่สำเร็จ ระบบจะดึงข้อมูลเองอัตโนมัติ");
+      }
     });
   } catch(e) {
+    console.error("Supabase Init Error:", e);
     setOnlineStatus(false);
   }
 } else {
   setOnlineStatus(false);
-}
-
-function notifySync() {
-  if (realtimeChannel) {
-    realtimeChannel.send({
-      type: 'broadcast',
-      event: 'sync_data',
-      payload: { timestamp: Date.now() }
-    });
-  }
 }
 
 // Data Handlers
@@ -267,10 +262,17 @@ async function dbGet(table) {
   if(!sb) return JSON.parse(localStorage.getItem(table)||'[]');
   try {
     let {data, error} = await sb.from(table).select('*').order('id');
-    if(error) throw error;
-    setOnlineStatus(true);
+    if(error) {
+      console.error("ดึงข้อมูลพลาด:", error);
+      throw error;
+    }
+    // หากดึงข้อมูลสำเร็จ ถือว่าฐานข้อมูลเชื่อมต่อได้แล้ว ให้ขึ้นสีเขียวไปเลย!
+    if(document.getElementById('offlineIndicator').className.includes('offline-mode')) {
+       setOnlineStatus(true);
+    }
     return data || [];
   } catch(e) {
+    setOnlineStatus(false, 'ดึงข้อมูลไม่สำเร็จ');
     return JSON.parse(localStorage.getItem(table)||'[]');
   }
 }
@@ -279,16 +281,16 @@ async function dbInsert(table, row) {
   if(!sb) { 
     let a = await dbGet(table); row.id = Date.now(); a.push(row); 
     localStorage.setItem(table, JSON.stringify(a)); 
-    await refreshAll(); notifySync(); return row; 
+    await refreshAll(); return row; 
   }
   try {
     let {data, error} = await sb.from(table).insert(row).select().single();
     if(error) throw error;
-    await refreshAll(); notifySync();
+    await refreshAll();
     return data;
   } catch(e) {
     let a = await dbGet(table); row.id = Date.now(); a.push(row); localStorage.setItem(table, JSON.stringify(a));
-    await refreshAll(); notifySync();
+    await refreshAll();
     return row;
   }
 }
@@ -297,16 +299,16 @@ async function dbUpdate(table, id, row) {
   if(!sb) { 
     let a = await dbGet(table); a = a.map(x => x.id === id ? {...x,...row} : x); 
     localStorage.setItem(table, JSON.stringify(a)); 
-    await refreshAll(); notifySync(); return true; 
+    await refreshAll(); return true; 
   }
   try {
     let {error} = await sb.from(table).update(row).eq('id', id);
     if(error) throw error;
-    await refreshAll(); notifySync();
+    await refreshAll();
     return true;
   } catch(e) {
     let a = await dbGet(table); a = a.map(x => x.id === id ? {...x,...row} : x); localStorage.setItem(table, JSON.stringify(a));
-    await refreshAll(); notifySync();
+    await refreshAll();
     return true;
   }
 }
@@ -315,16 +317,16 @@ async function dbDelete(table, id) {
   if(!sb) { 
     let a = await dbGet(table); a = a.filter(x => x.id !== id); 
     localStorage.setItem(table, JSON.stringify(a)); 
-    await refreshAll(); notifySync(); return true; 
+    await refreshAll(); return true; 
   }
   try {
     let {error} = await sb.from(table).delete().eq('id', id);
     if(error) throw error;
-    await refreshAll(); notifySync();
+    await refreshAll();
     return true;
   } catch(e) {
     let a = await dbGet(table); a = a.filter(x => x.id !== id); localStorage.setItem(table, JSON.stringify(a));
-    await refreshAll(); notifySync();
+    await refreshAll();
     return true;
   }
 }
