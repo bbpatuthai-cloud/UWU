@@ -213,47 +213,119 @@ window.SUPABASE_CONFIG = {
 };
 
 let sb = null;
+let realtimeChannel = null;
+let realtimeRetryTimer = null;
+let realtimeRetryDelay = 1000;
+let refreshInProgress = false;
 let tables = [], menus = [], orders = [], staff = [], completedOrders = [];
-let topSellingItemStr = "🍓 -"; 
+let topSellingItemStr = "🍓 -";
 
 function setOnlineStatus(online) {
   const el = document.getElementById('offlineIndicator');
-  if (online) {
-    el.className = 'online-mode';
-    el.textContent = '🟢 เชื่อมต่อ Realtime';
-    el.style.display = 'inline-block';
-  } else {
-    el.className = 'offline-mode';
-    el.textContent = '🟡 กำลังอัปเดต / เน็ตหลุด';
-    el.style.display = 'inline-block';
+  if (!el) return;
+  el.className = online ? 'online-mode' : 'offline-mode';
+  el.textContent = online ? '🟢 เชื่อมต่อ Realtime' : '🟡 กำลังเชื่อมต่อ Realtime...';
+  el.style.display = 'inline-block';
+}
+
+async function refreshRealtimeData() {
+  if (refreshInProgress) return;
+  refreshInProgress = true;
+  try { await refreshAll(); } finally { refreshInProgress = false; }
+}
+
+function scheduleRealtimeReconnect() {
+  if (realtimeRetryTimer || !sb) return;
+  setOnlineStatus(false);
+
+  realtimeRetryTimer = setTimeout(() => {
+    realtimeRetryTimer = null;
+    createRealtimeChannel();
+  }, realtimeRetryDelay);
+
+  // reconnect เร็วเมื่อหลุด แต่ไม่ยิงถี่เกินไป
+  realtimeRetryDelay = Math.min(realtimeRetryDelay * 2, 15000);
+}
+
+function createRealtimeChannel() {
+  if (!sb) return;
+
+  if (realtimeChannel) {
+    try { sb.removeChannel(realtimeChannel); } catch(e) {}
+    realtimeChannel = null;
   }
+
+  realtimeChannel = sb.channel('uwu-cafe-realtime', {
+    config: { broadcast: { self: false }, presence: { key: 'uwu-cafe' } }
+  });
+
+  ['uwu_tables', 'uwu_menus', 'uwu_orders', 'uwu_staff'].forEach(tableName => {
+    realtimeChannel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: tableName },
+      () => refreshRealtimeData()
+    );
+  });
+
+  realtimeChannel.subscribe((status) => {
+    if (status === 'SUBSCRIBED') {
+      realtimeRetryDelay = 1000;
+      setOnlineStatus(true);
+      refreshRealtimeData();
+    } else if (
+      status === 'CHANNEL_ERROR' ||
+      status === 'TIMED_OUT' ||
+      status === 'CLOSED'
+    ) {
+      setOnlineStatus(false);
+      scheduleRealtimeReconnect();
+    }
+  });
 }
 
 if (window.SUPABASE_CONFIG.url && window.supabase) {
   try {
-    sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.publishableKey);
-    
-    // ตั้งค่า Subscribe Realtime ดักจับทุกตารางแบบแม่นยำ
-    sb.channel('public-db')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_tables' }, () => refreshAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_menus' }, () => refreshAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_orders' }, () => refreshAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_staff' }, () => refreshAll())
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setOnlineStatus(true);
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          setOnlineStatus(false);
-        }
-      });
-      
-      // ✨ เพิ่มระบบ Auto-Sync อัตโนมัติทุกๆ 30 วินาที เพื่อให้ข้อมูลและวันที่เป็นปัจจุบันเสมอ
-      setInterval(() => {
-        refreshAll();
-      }, 30000);
+    sb = supabase.createClient(
+      window.SUPABASE_CONFIG.url,
+      window.SUPABASE_CONFIG.publishableKey,
+      {
+        realtime: { params: { eventsPerSecond: 10 } },
+        auth: { persistSession: true, autoRefreshToken: true }
+      }
+    );
+
+    createRealtimeChannel();
+
+    // เน็ตกลับมา: ต่อ Realtime ใหม่ทันที
+    window.addEventListener('online', () => {
+      realtimeRetryDelay = 1000;
+      scheduleRealtimeReconnect();
+      refreshRealtimeData();
+    });
+
+    window.addEventListener('offline', () => setOnlineStatus(false));
+
+    // กลับมาเปิดแท็บ: sync ทันที
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        refreshRealtimeData();
+        if (!realtimeChannel) createRealtimeChannel();
+      }
+    });
+
+    // Watchdog ทุก 10 วินาที ช่วยให้ข้อมูลยังสดแม้ browser หลับ/connection เปลี่ยน
+    setInterval(() => {
+      if (!navigator.onLine) {
+        setOnlineStatus(false);
+        return;
+      }
+      refreshRealtimeData();
+      if (!realtimeChannel) createRealtimeChannel();
+    }, 10000);
 
   } catch(e) {
     setOnlineStatus(false);
+    scheduleRealtimeReconnect();
   }
 }
 
@@ -263,9 +335,10 @@ async function dbGet(table) {
   try {
     let {data, error} = await sb.from(table).select('*').order('id');
     if(error) throw error;
-    setOnlineStatus(true);
     return data || [];
   } catch(e) {
+    setOnlineStatus(false);
+    if (navigator.onLine) scheduleRealtimeReconnect();
     return JSON.parse(localStorage.getItem(table)||'[]');
   }
 }
