@@ -17,23 +17,24 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 .status.green{background:#e8f8ef;color:#45946b}.status.yellow{background:#fff4d9;color:#a9781d}.status.gray{background:#eee;color:#777}.status.blue{background:#e5f0ff;color:#3a7bd5}.status.red{background:#ffe5e5;color:#d63031}
 .menu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.menu-item{border:1px solid #f1dce5;border-radius:18px;padding:16px;background:#fff}.menu-img{height:130px;border-radius:14px;background:#fff0f6;display:flex;align-items:center;justify-content:center;font-size:52px;margin-bottom:12px}.price{color:#d65f91;font-weight:800}
 
-/* Shift Box UI ตามรูปแบบภาพ */
+/* Shift Box UI โทนชมพูขาวน่ารัก */
 .shift-box-panel {
-  background: #180d19;
-  border: 1px solid #7c2d60;
-  border-radius: 18px;
-  padding: 20px;
+  background: linear-gradient(180deg, #fffafd 0%, #ffffff 100%);
+  border: 2px solid #f8d5e5;
+  border-radius: 22px;
+  padding: 22px;
   margin-bottom: 20px;
-  color: #fff;
-  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  color: #5c4250;
+  box-shadow: 0 8px 25px rgba(214,95,145,0.08);
 }
 .shift-box-panel h3 {
   margin: 0 0 16px;
-  font-size: 18px;
-  color: #fff;
+  font-size: 19px;
+  color: #d65f91;
   display: flex;
   align-items: center;
   gap: 8px;
+  font-weight: 800;
 }
 .shift-controls {
   display: flex;
@@ -42,49 +43,56 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 }
 .shift-select-staff {
   flex: 1;
-  background: #0f0710;
-  border: 1px solid #4a2141;
-  color: #e2c2dd;
+  background: #fff7fb;
+  border: 1px solid #f0cddd;
+  color: #67515c;
   padding: 12px 16px;
-  border-radius: 12px;
+  border-radius: 14px;
   font-size: 14px;
   outline: none;
+  font-weight: bold;
+}
+.shift-select-staff:focus {
+  border-color: #e88bb2;
+  box-shadow: 0 0 0 3px #ffe5f0;
 }
 .shift-btn-in {
-  background: #0e3d26;
-  border: 1px solid #1c7348;
-  color: #4ade80;
+  background: #e8f8ef;
+  border: 1px solid #b7ebc6;
+  color: #2e7d32;
   padding: 12px 24px;
-  border-radius: 12px;
-  font-weight: bold;
+  border-radius: 14px;
+  font-weight: 800;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: .15s;
+  transition: .18s;
+  box-shadow: 0 4px 12px rgba(46,125,50,0.08);
 }
-.shift-btn-in:hover { background: #145332; }
+.shift-btn-in:hover { background: #d4f3e4; transform: translateY(-1px); }
 .shift-btn-out {
-  background: #4c1d24;
-  border: 1px solid #8c2a38;
-  color: #f87171;
+  background: #ffe9f1;
+  border: 1px solid #f8c0d6;
+  color: #d65f91;
   padding: 12px 24px;
-  border-radius: 12px;
-  font-weight: bold;
+  border-radius: 14px;
+  font-weight: 800;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: .15s;
+  transition: .18s;
+  box-shadow: 0 4px 12px rgba(214,95,145,0.08);
 }
-.shift-btn-out:hover { background: #6b212c; }
+.shift-btn-out:hover { background: #ffd1e3; transform: translateY(-1px); }
 .shift-divider {
-  border-top: 1px solid #33182b;
+  border-top: 1px dashed #f2d2e2;
   margin: 16px 0 12px;
 }
 .shift-recent-logs {
   font-size: 13px;
-  color: #bfa1ba;
+  color: #9c7b8b;
 }
 
 /* Modal UI Fixes */
@@ -148,7 +156,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
       <button onclick="showPage('orders',this)"><span>🧾</span> จัดการออเดอร์</button>
       <button onclick="showPage('menus',this)"><span>🍰</span> จัดการเมนู</button>
       <button onclick="showPage('tables',this)"><span>🪑</span> จัดการโต๊ะ</button>
-      <button onclick="showPage('staff',this)"><span>👥</span> จัดการพนักงาน</button>
+      <button onclick="showPage('staff',this)"><span>👥</span> เข้า-ออกเวร</button>
       <button onclick="openManagerLogin(this)"><span>👑</span> ผู้จัดการ</button>
     </div>
   </div>
@@ -176,7 +184,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 </section>
 
 <section id="staff" class="page">
- <!-- บันทึกเวลาเข้า-ออกเวรพนักงาน UI ตามรูปภาพ -->
+ <!-- บันทึกเวลาเข้า-ออกเวรพนักงาน UI พาสเทลชมพูขาวน่ารัก -->
  <div class="shift-box-panel">
   <h3>⏰ บันทึกเวลาเข้า-ออกเวรพนักงาน (Realtime)</h3>
   <div class="shift-controls">
@@ -193,8 +201,10 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
   </div>
  </div>
 
- <div class="panel"><div class="top" style="display:flex; justify-content:space-between; margin-bottom: 20px;"><h2>รายชื่อพนักงานทั้งหมด</h2><button class="btn" onclick="openStaffModal()">＋ เพิ่มพนักงาน</button></div>
- <table><thead><tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>สถานะงาน</th><th>การเข้า-ออกเวร</th><th>เวลาที่ทำงานไปแล้ว</th><th>จัดการ</th></tr></thead><tbody id="staffTable"></tbody></table></div>
+ <div class="panel">
+  <div class="top" style="display:flex; justify-content:space-between; margin-bottom: 15px;"><h2>⏱️ เวลาที่ทำงานไปแล้วของพนักงานที่เข้าเวร</h2></div>
+  <table><thead><tr><th>ชื่อพนักงาน</th><th>ตำแหน่ง</th><th>สถานะงาน</th><th>การเข้า-ออกเวร</th><th>เวลาที่ทำงานไปแล้ว</th></tr></thead><tbody id="staffTable"></tbody></table>
+ </div>
 </section>
 
 <section id="manager" class="page">
@@ -205,7 +215,21 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
   <div class="card"><small>เมนูขายดี</small><div class="value" id="topSellingItem">🍓 -</div></div>
  </div>
 
+ <!-- ส่วนจัดการรายชื่อพนักงาน ย้ายมาอยู่ในหน้าผู้จัดการ -->
  <div class="panel" style="margin-top:15px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+    <h2>👥 จัดการรายชื่อพนักงาน</h2>
+    <button class="btn" onclick="openStaffModal()">＋ เพิ่มพนักงาน</button>
+  </div>
+  <div class="scroll-table-wrap">
+    <table>
+      <thead><tr><th>ชื่อพนักงาน</th><th>ตำแหน่ง</th><th>สถานะงาน</th><th>การเข้าเวร</th><th>จัดการ</th></tr></thead>
+      <tbody id="managerStaffManagerTable"></tbody>
+    </table>
+  </div>
+ </div>
+
+ <div class="panel">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <h2>💾 บันทึกยอดประจำวัน</h2>
     <button class="btn" onclick="saveDailySummary()">💾 บันทึกสรุปยอดวันนี้</button>
@@ -540,7 +564,8 @@ async function refreshAll() {
   renderMenus();
   renderTables();
   renderStaff();
-  renderShiftSelectOptions();
+  renderStaffSelectOptions();
+  renderManagerStaffTable();
   renderManagerData();
   renderShiftLogs();
   renderLiveShiftTimes();
@@ -555,7 +580,7 @@ setInterval(() => {
 }, 1000);
 
 function formatDate(date){ const d=new Date(date+"T00:00:00"); return d.toLocaleDateString("th-TH",{day:"2-digit",month:"2-digit",year:"numeric"}); }
-const titles={dashboard:"Dashboard",orders:"จัดการออเดอร์",menus:"จัดการเมนู",tables:"จัดการโต๊ะ",staff:"จัดการพนักงาน",manager:"ผู้จัดการ"};
+const titles={dashboard:"Dashboard",orders:"จัดการออเดอร์",menus:"จัดการเมนู",tables:"จัดการโต๊ะ",staff:"เข้า-ออกเวร",manager:"ผู้จัดการ"};
 function showPage(id,btn){document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".top-menu button").forEach(b=>b.classList.remove("active"));btn.classList.add("active");document.getElementById("pageTitle").textContent=titles[id];}
 function statusClass(s){return s==="เสร็จแล้ว"?"green":s==="กำลังทำ"?"yellow":s==="มีลูกค้า"?"yellow":s==="ว่าง"?"green":s==="พัก"?"gray":""}
 
@@ -678,35 +703,47 @@ function renderStaffSelectOptions() {
   const select = document.getElementById("shiftStaffSelect");
   if (!select) return;
   select.innerHTML = '<option value="">-- เลือกชื่อพนักงาน --</option>' + 
-    staff.map(s => `<option value="${s.dbId}">${s.name} (${s.role}) - Status: ${s.attendance}</option>`).join('');
+    staff.map(s => `<option value="${s.dbId}">${s.name} (${s.role}) - เวร: ${s.attendance}</option>`).join('');
 }
 
+// หน้าพนักงาน: แสดงเฉพาะรายชื่อและเวลาที่เข้าเวรอยู่
 function renderStaff(){
   const e=document.getElementById("staffTable");
+  if(!e) return;
+  
   e.innerHTML=staff.map((s,i)=>{
+    const isWorking = s.attendance === "เข้าเวร";
     return `<tr>
       <td><b>${s.name}</b></td>
       <td>${s.role}</td>
-      <td>
-        <select class="status-select" onchange="changeStaffStatus(${i},this.value)">
-          <option value="กำลังทำงาน" ${s.status==="กำลังทำงาน"?"selected":""}>🟢 กำลังทำงาน</option>
-          <option value="พัก" ${s.status==="พัก"?"selected":""}>🟡 พัก</option>
-          <option value="ลา" ${s.status==="ลา"?"selected":""}>🔴 ลา</option>
-        </select>
-      </td>
-      <td>
-        <select class="status-select" onchange="changeAttendance(${i},this.value)">
-          <option value="ออกเวร" ${s.attendance==="ออกเวร"?"selected":""}>🔵 ออกเวร</option>
-          <option value="เข้าเวร" ${s.attendance==="เข้าเวร"?"selected":""}>🟢 เข้าเวร</option>
-        </select>
-      </td>
+      <td><span class="status ${s.status === 'กำลังทำงาน' ? 'green' : s.status === 'พัก' ? 'yellow' : 'red'}">${s.status}</span></td>
+      <td><span class="status ${isWorking ? 'green' : 'blue'}">${s.attendance}</span></td>
       <td><span id="staff-timer-${i}" class="live-timer">⏱️ -</span></td>
-      <td class="staff-row-actions">
-        <button class="btn edit-staff-btn" onclick="openStaffModal(${i})">แก้ไข</button>
-        <button class="btn danger" onclick="removeStaff(${i})">ลบ</button>
-      </td>
     </tr>`;
   }).join("");
+}
+
+// หน้าผู้จัดการ: จัดการรายชื่อพนักงาน แก้ไข / ลบ
+function renderManagerStaffTable() {
+  const tbody = document.getElementById("managerStaffManagerTable");
+  if (!tbody) return;
+
+  tbody.innerHTML = staff.map((s, i) => `<tr>
+    <td><b>${s.name}</b></td>
+    <td>${s.role}</td>
+    <td>
+      <select class="status-select" onchange="changeStaffStatus(${i},this.value)">
+        <option value="กำลังทำงาน" ${s.status==="กำลังทำงาน"?"selected":""}>🟢 กำลังทำงาน</option>
+        <option value="พัก" ${s.status==="พัก"?"selected":""}>🟡 พัก</option>
+        <option value="ลา" ${s.status==="ลา"?"selected":""}>🔴 ลา</option>
+      </select>
+    </td>
+    <td><span class="status ${s.attendance === 'เข้าเวร' ? 'green' : 'blue'}">${s.attendance}</span></td>
+    <td class="staff-row-actions">
+      <button class="btn edit-staff-btn" onclick="openStaffModal(${i})">แก้ไข</button>
+      <button class="btn danger" onclick="removeStaff(${i})">ลบ</button>
+    </td>
+  </tr>`).join("");
 }
 
 async function submitQuickShift(nextStatus) {
