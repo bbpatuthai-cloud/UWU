@@ -243,7 +243,6 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
   </div>
  </div>
 
- <!-- ปรับปรุงส่วนนี้: สรุปยอดขายรายเดือน (คลิกดูสถิติตายตัวรายวันได้) -->
  <div class="panel">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <h2>📅 สรุปยอดขายรายเดือน (Monthly Summary)</h2>
@@ -397,12 +396,43 @@ window.SUPABASE_CONFIG = {
   publishableKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kbXVjZHZyZHlmcWFhbmdxY2dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MjM4ODgsImV4cCI6MjEwMjA5OTg4OH0.CR657sOgm6va66bg5fqIzxnzjzGnXScIr14Par6J4xA"
 };
 
+// ==========================================
+// 🔗 DISCORD WEBHOOK URL
+// ==========================================
+const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1537109724619866213/QIV9HU6-pEyG8UH-no_zVmF3qXUz7KHEKFMI_tBky2_3-hYAgmPiEuEvu0xi_x7NeJ3K";
+
 let sb = null;
 let realtimeChannel = null;
 let refreshInProgress = false;
 let refreshTimer = null;
 let tables = [], menus = [], orders = [], staff = [], completedOrders = [], dailySummaries = [];
 let topSellingItemStr = "🍓 -";
+
+// ฟังก์ชันส่งการแจ้งเตือนไป Discord Webhook
+async function sendDiscordNotification(title, description, color = 0xd65f91, fields = []) {
+  if (!DISCORD_WEBHOOK_URL || DISCORD_WEBHOOK_URL.includes("ใส่_DISCORD_WEBHOOK_URL_ตรงนี้")) return;
+  
+  const payload = {
+    embeds: [{
+      title: title,
+      description: description,
+      color: color,
+      fields: fields,
+      footer: { text: "UWU Cafe Manager System 🐾" },
+      timestamp: new Date().toISOString()
+    }]
+  };
+
+  try {
+    await fetch(DISCORD_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    console.error("ส่งการแจ้งเตือน Discord ล้มเหลว:", err);
+  }
+}
 
 function setOnlineStatus(online) {
   const el = document.getElementById('offlineIndicator');
@@ -686,7 +716,20 @@ async function confirmNewOrder(){
   if(!currentOrderItems.length){alert("เลือกเมนูก่อนนะเหมียว 🐱");return;}
   const total = currentOrderItems.reduce((s,item)=>s+item.price*item.qty,0);
   const itemsFormatForDb = currentOrderItems.map(it => ({ menu_id: it.dbId, name: it.name, price: it.price, qty: it.qty }));
-  await dbInsert('uwu_orders', { table_id: Number(tId), items: JSON.stringify(itemsFormatForDb), total: total, status: 'กำลังทำ' });
+  const res = await dbInsert('uwu_orders', { table_id: Number(tId), items: JSON.stringify(itemsFormatForDb), total: total, status: 'กำลังทำ' });
+  
+  // ซิงค์การแจ้งเตือนออเดอร์ใหม่ไปที่ Discord
+  const tableObj = tables.find(t => String(t.dbId) === String(tId));
+  const tableName = tableObj ? tableObj.id : 'โต๊ะ '+tId;
+  const itemsText = currentOrderItems.map(it => `• ${it.name} x ${it.qty} (฿${(it.price * it.qty).toLocaleString('th-TH')})`).join('\n');
+  
+  sendDiscordNotification(
+    "🧾 มีออเดอร์ใหม่เข้ามานะเหมียว!",
+    `**ตำแหน่ง:** ${tableName}\n**รายการที่สั่ง:**\n${itemsText}`,
+    0x34d399,
+    [{ name: "ยอดรวมทั้งสิ้น", value: `฿${total.toLocaleString('th-TH')}`, inline: true }]
+  );
+
   closeOrderModal();
 }
 
@@ -745,6 +788,7 @@ function renderStaffSelectOptions() {
   if (currentVal) select.value = currentVal;
 }
 
+// บันทึกเวลาเข้า-ออกเวร พร้อมแจ้งเตือนเข้า Discord
 async function clockInOut(type) {
   const select = document.getElementById("staffNameSelect");
   const name = select.value;
@@ -771,6 +815,15 @@ async function clockInOut(type) {
 
   if (res) {
     alert(`บันทึกเวลา "${type}" สำหรับ ${name} เรียบร้อยแล้วเหมียว! 🐾`);
+    
+    // ซิงค์การเข้า-ออกเวรไปยัง Discord
+    const isClockIn = type === 'เข้าเวร';
+    sendDiscordNotification(
+      isClockIn ? "🟢 พนักงานเข้าเวรปฏิบัติงาน" : "🔴 พนักงานออกเวรแล้ว",
+      `**ชื่อพนักงาน:** ${name}\n**เวลาบันทึก:** ${now.toLocaleTimeString('th-TH')}`,
+      isClockIn ? 0x22c55e : 0xef4444
+    );
+
     select.value = "";
     refreshAll();
   }
@@ -1055,6 +1108,7 @@ function renderLiveShiftTimes() {
   });
 }
 
+// บันทึกสรุปยอดประจำวัน พร้อมซิงค์ไป Discord
 async function saveDailySummary() {
   const todayStr = getLocalISO();
   const todayOrders = completedOrders.filter(o => o.date === todayStr);
@@ -1068,11 +1122,23 @@ async function saveDailySummary() {
       top_item: topSellingItemStr,
       timestamp: Date.now()
     });
+
+    // ส่งการแจ้งเตือนปิดยอดขายไปที่ Discord
+    sendDiscordNotification(
+      "💾 บันทึกสรุปยอดขายประจำวันสำเร็จ!",
+      `**ประจำวันที่:** ${formatDate(todayStr)}`,
+      0xeab308,
+      [
+        { name: "💰 ยอดขายรวม", value: `฿${todaySales.toLocaleString('th-TH')}`, inline: true },
+        { name: "🧾 จำนวนออเดอร์", value: `${todayOrders.length} ออเดอร์`, inline: true },
+        { name: "⭐ เมนูขายดี", value: topSellingItemStr, inline: false }
+      ]
+    );
+
     alert("บันทึกสรุปยอดเรียบร้อยแล้วเหมียว! 🐾");
   }
 }
 
-// ระบบจัดกลุ่มข้อมูลเปนรายเดือน
 function renderMonthlySummaries() {
   const tbody = document.getElementById("monthlySummaryTable");
   if(!tbody) return;
@@ -1082,7 +1148,6 @@ function renderMonthlySummaries() {
     return;
   }
 
-  // จัดกลุ่มข้อมูลแยกตาม เดือน-ปี (เช่น "2026-08")
   const monthGroups = {};
   dailySummaries.forEach(d => {
     const monthKey = d.date ? d.date.slice(0, 7) : 'ไม่ระบุ';
@@ -1117,7 +1182,6 @@ function renderMonthlySummaries() {
   }).join("");
 }
 
-// เปิด Modal ดูสรุปยอดขายรายวันของเดือนที่เลือก
 function openDailyDetailModal(monthKey) {
   const dateObj = new Date(monthKey + "-01T00:00:00");
   const monthName = isNaN(dateObj.getTime()) ? monthKey : dateObj.toLocaleDateString("th-TH", { month: "long", year: "numeric" });
@@ -1157,7 +1221,6 @@ async function deleteDailySummary(id) {
   }
 }
 
-// ดูรายการอาหารที่ขายได้ของวันนั้นๆ
 function viewDayItemsDetail(dateStr) {
   const dayOrders = completedOrders.filter(o => o.date === dateStr);
   const totalSales = dayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
