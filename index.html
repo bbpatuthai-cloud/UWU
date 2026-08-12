@@ -13,7 +13,7 @@
 .panel{background:white;border:1px solid #f2dce6;border-radius:20px;padding:20px;margin-top:20px}.panel h2{margin-top:0;font-size:19px}.btn{border:0;background:#e98bb3;color:white;padding:10px 15px;border-radius:12px;cursor:pointer;font-weight:700}.btn.secondary{background:#ffe5f0;color:#c85e88}.btn.danger{background:#f28b9e}.actions{display:flex;gap:8px;flex-wrap:wrap}
 table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10px;border-bottom:1px solid #f2e4ea}th{color:#9a7d89;font-size:13px}.status{padding:5px 10px;border-radius:15px;font-size:12px;background:#ffe9f1;color:#d45d8c}
 .status-select{min-width:145px;padding:9px 12px;border:1px solid #f0cddd;border-radius:12px;background:#fff7fb;color:#c85e88;font-size:13px;font-weight:700;cursor:pointer;outline:none}
-.status-select:focus{border-color:#e88bb2;box-shadow:0 0 0 3px #ffe5f0}
+.status-select:focus{border-color:#e88bb2;box-shadow:0 0 0 3px #ffeaf3}
 .status.green{background:#e8f8ef;color:#45946b}.status.yellow{background:#fff4d9;color:#a9781d}.status.gray{background:#eee;color:#777}.status.blue{background:#e5f0ff;color:#3a7bd5}.status.red{background:#ffe5e5;color:#d63031}
 .menu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.menu-item{border:1px solid #f1dce5;border-radius:18px;padding:16px;background:#fff}.menu-img{height:130px;border-radius:14px;background:#fff0f6;display:flex;align-items:center;justify-content:center;font-size:52px;margin-bottom:12px}.price{color:#d65f91;font-weight:800}
 
@@ -63,11 +63,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 .scroll-table-wrap th { position: sticky; top: 0; background: #fffafc; z-index: 1; box-shadow: 0 2px 5px rgba(214,95,145,.06); }
 .scroll-table-wrap::-webkit-scrollbar { width: 6px; }
 .scroll-table-wrap::-webkit-scrollbar-thumb { background: #f0cddd; border-radius: 4px; }
-.live-timer { font-weight: bold; color: #d65f91; background: #ffe9f1; padding: 3px 8px; border-radius: 10px; font-size: 12px; }
-.shift-btn { border: 0; padding: 7px 14px; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 13px; transition: .15s; }
-.shift-btn.in { background: #e8f8ef; color: #2e7d32; border: 1px solid #b7ebc6; }
-.shift-btn.out { background: #e5f0ff; color: #2b6cb0; border: 1px solid #bee3f8; }
-.shift-btn:hover { transform: scale(1.03); }
+.live-timer { font-weight: bold; color: #d65f91; background: #ffe9f1; padding: 4px 10px; border-radius: 12px; font-size: 13px; display: inline-block; }
 </style>
 </head>
 <body>
@@ -111,7 +107,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 
 <section id="staff" class="page">
  <div class="panel"><div class="top" style="display:flex; justify-content:space-between; margin-bottom: 20px;"><h2>จัดการพนักงาน</h2><button class="btn" onclick="openStaffModal()">＋ เพิ่มพนักงาน</button></div>
- <table><thead><tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>สถานะ</th><th>เข้า-ออกเวร (Realtime)</th><th>เวลาการทำงาน</th><th>จัดการ</th></tr></thead><tbody id="staffTable"></tbody></table></div>
+ <table><thead><tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>สถานะงาน</th><th>การเข้า-ออกเวร</th><th>เวลาที่ทำงานไปแล้ว</th><th>จัดการ</th></tr></thead><tbody id="staffTable"></tbody></table></div>
 </section>
 
 <section id="manager" class="page">
@@ -201,7 +197,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 </div>
 </div></div>
 
-<!-- Modal เพิ่ม/แก้ไขเมนู UI ปรับปรุงใหม่ -->
+<!-- Modal เพิ่ม/แก้ไขเมนู -->
 <div class="modal" id="menuModal" onclick="if(event.target===this)closeMenuModal()">
 <div class="modal-card-box">
   <div class="modal-cat-icon">🍰</div>
@@ -224,7 +220,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
   </div>
 </div></div>
 
-<!-- Modal เพิ่ม/แก้ไขพนักงาน UI ปรับปรุงใหม่ -->
+<!-- Modal เพิ่ม/แก้ไขพนักงาน -->
 <div class="modal" id="staffModal" onclick="if(event.target===this)closeStaffModal()">
 <div class="modal-card-box">
   <div class="modal-cat-icon">👥</div>
@@ -448,7 +444,7 @@ async function refreshAll() {
   }
 
   staff = rawStaff.map(s => ({
-    dbId: s.id, name: s.name, role: s.role, status: s.status, attendance: s.attendance,
+    dbId: s.id, name: s.name, role: s.role, status: s.status, attendance: s.attendance || 'ออกเวร',
     attendanceTime: s.attendance_time || '-',
     shiftStartTimestamp: s.shift_start_timestamp || null
   }));
@@ -466,7 +462,7 @@ async function refreshAll() {
 
 window.onload = refreshAll;
 
-// ตัวนับเวลารายวินาทีสำหรับทุกหน้า
+// ตัวนับเวลารายวินาทีสำหรับ Realtime Shift Timer
 setInterval(() => {
   renderLiveShiftTimes();
 }, 1000);
@@ -594,7 +590,6 @@ async function deleteTable(dbId){ if(confirm("ต้องการลบโต�
 function renderStaff(){
   const e=document.getElementById("staffTable");
   e.innerHTML=staff.map((s,i)=>{
-    const isWorking = s.attendance === "เข้าเวร";
     return `<tr>
       <td><b>${s.name}</b></td>
       <td>${s.role}</td>
@@ -606,9 +601,10 @@ function renderStaff(){
         </select>
       </td>
       <td>
-        <button class="shift-btn ${isWorking ? 'out' : 'in'}" onclick="toggleShift(${i})">
-          ${isWorking ? '🔵 กดออกเวร' : '🟢 กดเข้าเวร'}
-        </button>
+        <select class="status-select" onchange="changeAttendance(${i},this.value)">
+          <option value="ออกเวร" ${s.attendance==="ออกเวร"?"selected":""}>🔵 ออกเวร</option>
+          <option value="เข้าเวร" ${s.attendance==="เข้าเวร"?"selected":""}>🟢 เข้าเวร</option>
+        </select>
       </td>
       <td><span id="staff-timer-${i}" class="live-timer">⏱️ -</span></td>
       <td class="staff-row-actions">
@@ -624,14 +620,19 @@ async function changeStaffStatus(i, status){
   if(s.dbId) await dbUpdate('uwu_staff', s.dbId, { status: status });
 }
 
-// สลับสถานะ เข้า-ออกเวรผ่านปุ่มกดแบบเรียลไทม์
-async function toggleShift(i) {
+// เปลี่ยนแปลงสถานะการเข้า-ออกเวรผ่าน Dropdown
+async function changeAttendance(i, nextStatus) {
   const s = staff[i];
-  const isWorking = s.attendance === "เข้าเวร";
-  const nextStatus = isWorking ? "ออกเวร" : "เข้าเวร";
   const timeStr = new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"});
   const dateStr = getLocalISO();
-  let startTs = isWorking ? null : Date.now();
+  
+  // บันทึกเวลาเริ่มเข้าเวรใหม่เฉพาะเมื่อสลับมาเป็น "เข้าเวร"
+  let startTs = s.shiftStartTimestamp;
+  if (nextStatus === "เข้าเวร" && s.attendance !== "เข้าเวร") {
+    startTs = Date.now();
+  } else if (nextStatus === "ออกเวร") {
+    startTs = null;
+  }
 
   if(s.dbId) {
     await dbUpdate('uwu_staff', s.dbId, { 
@@ -668,7 +669,7 @@ async function saveStaff(){
   const status = document.getElementById("staffStatus").value;
   
   if(editingStaffIndex < 0) {
-    await dbInsert('uwu_staff', { name, role, status, attendance: 'ยังไม่เข้าเวร', attendance_time: '-' });
+    await dbInsert('uwu_staff', { name, role, status, attendance: 'ออกเวร', attendance_time: '-' });
   } else {
     const s = staff[editingStaffIndex];
     if(s.dbId) await dbUpdate('uwu_staff', s.dbId, { name, role, status });
@@ -718,11 +719,11 @@ function renderShiftLogs() {
   }).join("");
 }
 
-// แสดงเวลาเข้าเวรแบบ Realtime ในหน้าพนักงานและผู้จัดการ
+// แสดงเวลานับเดินหน้าของพนักงานแบบ Realtime
 function renderLiveShiftTimes() {
   const now = Date.now();
   
-  // ในหน้าพนักงาน
+  // 1. คำนวณในหน้าพนักงาน
   staff.forEach((s, i) => {
     const timerEl = document.getElementById(`staff-timer-${i}`);
     if (timerEl) {
@@ -738,7 +739,7 @@ function renderLiveShiftTimes() {
     }
   });
 
-  // ในหน้าผู้จัดการ
+  // 2. คำนวณในหน้าผู้จัดการ
   const tbody = document.getElementById("managerStaffShiftTable");
   if (!tbody) return;
 
