@@ -505,6 +505,18 @@ function getLocalISO(d = new Date()) {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
+// แปลงฟอร์แมตเมนูในรายการออเดอร์ให้โชว์เฉพาะชื่อและจำนวนอาหาร
+function formatOrderItemsText(rawItems) {
+  if (!rawItems) return '-';
+  try {
+    const itemsArr = typeof rawItems === 'string' ? JSON.parse(rawItems) : rawItems;
+    if (Array.isArray(itemsArr) && itemsArr.length > 0) {
+      return itemsArr.map(it => `${it.name || 'เมนู'} ×${it.qty || 1}`).join(', ');
+    }
+  } catch(e){}
+  return String(rawItems);
+}
+
 async function refreshAll() {
   const rawTables = await dbGet('uwu_tables');
   const rawMenus = await dbGet('uwu_menus');
@@ -535,7 +547,7 @@ async function refreshAll() {
     let itemsArr = [];
     try { itemsArr = JSON.parse(o.items || '[]'); } catch(e){}
     itemsArr.forEach(it => { itemCounts[it.name] = (itemCounts[it.name] || 0) + it.qty; });
-    let itemsText = itemsArr.map(it => `${it.name} ×${it.qty}`).join(', ');
+    let itemsText = formatOrderItemsText(o.items);
     let tableObj = tables.find(t => String(t.dbId) === String(o.table_id));
     let tableName = tableObj ? tableObj.id : (o.table_id ? 'โต๊ะ '+o.table_id : 'กลับบ้าน');
 
@@ -587,7 +599,7 @@ function statusClass(s){return s==="เสร็จแล้ว"?"green":s==="�
 function renderOrders(){
   const normalOrders = orders.filter(o => o.status !== 'CLOCK_LOG' && o.status !== 'DAILY_SETTLEMENT');
   let h=normalOrders.map((o,i)=>`<tr>
-    <td>${formatDate(o.created_at ? getLocalISO(new Date(o.created_at)) : getLocalISO())}</td><td>#${String(o.id).padStart(3, "0")}</td><td>${o.table_id ? 'โต๊ะ '+o.table_id : 'กลับบ้าน'}</td><td>${o.items}</td>
+    <td>${formatDate(o.created_at ? getLocalISO(new Date(o.created_at)) : getLocalISO())}</td><td>#${String(o.id).padStart(3, "0")}</td><td>${o.table_id ? 'โต๊ะ '+o.table_id : 'กลับบ้าน'}</td><td>${formatOrderItemsText(o.items)}</td>
     <td>฿${Number(o.total).toLocaleString("th-TH")}</td>
     <td>
       <select class="status-select" onchange="changeStatus(${o.id}, this.value)">
@@ -601,7 +613,7 @@ function renderOrders(){
   document.getElementById("ordersTable").innerHTML=h;
   
   document.getElementById("dashOrders").innerHTML=normalOrders.slice(0,5).map(o=>`<tr>
-    <td>${formatDate(o.created_at ? getLocalISO(new Date(o.created_at)) : getLocalISO())}</td><td>#${String(o.id).padStart(3, "0")}</td><td>${o.table_id ? 'โต๊ะ '+o.table_id : 'กลับบ้าน'}</td><td>${o.items}</td>
+    <td>${formatDate(o.created_at ? getLocalISO(new Date(o.created_at)) : getLocalISO())}</td><td>#${String(o.id).padStart(3, "0")}</td><td>${o.table_id ? 'โต๊ะ '+o.table_id : 'กลับบ้าน'}</td><td>${formatOrderItemsText(o.items)}</td>
     <td>฿${Number(o.total).toLocaleString("th-TH")}</td>
     <td><span class="status ${statusClass(o.status)}">${o.status}</span></td>
   </tr>`).join("");
