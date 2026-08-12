@@ -207,14 +207,13 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 </div>
 
 <script>
-// Config Supabase Realtime
 window.SUPABASE_CONFIG = {
   url: "https://vehsmnstxrdzcrsrsgzr.supabase.co",
   publishableKey: "sb_publishable_1ddU0deXdUTJCOOz6F52Ug_3xYtUNhP"
 };
 
 let sb = null;
-let realtimeChannel = null;
+let tables = [], menus = [], orders = [], staff = [], completedOrders = [];
 
 function setOnlineStatus(online) {
   const el = document.getElementById('offlineIndicator');
@@ -228,38 +227,20 @@ function setOnlineStatus(online) {
   }
 }
 
+// 🟢 ระบบ Realtime ที่ปรับปรุงใหม่
 if (window.SUPABASE_CONFIG.url && window.supabase) {
   sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.publishableKey);
-  
-  // Realtime Listener ฟังการเปลี่ยนแปลงจาก DB และ Broadcast หาเครื่องอื่น
-  realtimeChannel = sb.channel('uwu-realtime-room', {
-    config: { broadcast: { self: true }, presence: { key: 'user' } }
-  })
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_tables' }, () => refreshAll())
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_menus' }, () => refreshAll())
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_orders' }, () => refreshAll())
-  .on('broadcast', { event: 'sync_event' }, () => refreshAll())
-  .subscribe((status) => {
-    if (status === 'SUBSCRIBED') {
-      setOnlineStatus(true);
-    } else {
-      setOnlineStatus(false);
-    }
-  });
+
+  sb.channel('uwu-realtime-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_tables' }, () => refreshAll())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_menus' }, () => refreshAll())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_orders' }, () => refreshAll())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_staff' }, () => refreshAll())
+    .subscribe((status) => {
+      setOnlineStatus(status === 'SUBSCRIBED');
+    });
 } else {
   setOnlineStatus(false);
-}
-
-let tables = [], menus = [], orders = [], staff = [], completedOrders = [];
-
-function notifyRealtimeChange() {
-  if (realtimeChannel) {
-    realtimeChannel.send({
-      type: 'broadcast',
-      event: 'sync_event',
-      payload: { timestamp: Date.now() }
-    });
-  }
 }
 
 // Data Handlers
@@ -267,10 +248,7 @@ async function dbGet(table) {
   if(!sb) return JSON.parse(localStorage.getItem(table)||'[]');
   try {
     let {data, error} = await sb.from(table).select('*').order('id');
-    if(error) {
-      setOnlineStatus(false);
-      return JSON.parse(localStorage.getItem(table)||'[]');
-    }
+    if(error) throw error;
     setOnlineStatus(true);
     return data || [];
   } catch(e) {
@@ -283,20 +261,15 @@ async function dbInsert(table, row) {
   if(!sb) { 
     let a = await dbGet(table); row.id = Date.now(); a.push(row); 
     localStorage.setItem(table, JSON.stringify(a)); 
-    await refreshAll(); notifyRealtimeChange(); return row; 
+    await refreshAll(); return row; 
   }
   try {
     let {data, error} = await sb.from(table).insert(row).select().single();
-    if(error) {
-      let a = await dbGet(table); row.id = Date.now(); a.push(row); localStorage.setItem(table, JSON.stringify(a));
-    }
-    await refreshAll();
-    notifyRealtimeChange();
+    if(error) throw error;
     return data;
   } catch(e) {
     let a = await dbGet(table); row.id = Date.now(); a.push(row); localStorage.setItem(table, JSON.stringify(a));
     await refreshAll();
-    notifyRealtimeChange();
     return row;
   }
 }
@@ -305,20 +278,15 @@ async function dbUpdate(table, id, row) {
   if(!sb) { 
     let a = await dbGet(table); a = a.map(x => x.id === id ? {...x,...row} : x); 
     localStorage.setItem(table, JSON.stringify(a)); 
-    await refreshAll(); notifyRealtimeChange(); return true; 
+    await refreshAll(); return true; 
   }
   try {
     let {error} = await sb.from(table).update(row).eq('id', id);
-    if(error) {
-      let a = await dbGet(table); a = a.map(x => x.id === id ? {...x,...row} : x); localStorage.setItem(table, JSON.stringify(a));
-    }
-    await refreshAll();
-    notifyRealtimeChange();
+    if(error) throw error;
     return true;
   } catch(e) {
     let a = await dbGet(table); a = a.map(x => x.id === id ? {...x,...row} : x); localStorage.setItem(table, JSON.stringify(a));
     await refreshAll();
-    notifyRealtimeChange();
     return true;
   }
 }
@@ -327,20 +295,15 @@ async function dbDelete(table, id) {
   if(!sb) { 
     let a = await dbGet(table); a = a.filter(x => x.id !== id); 
     localStorage.setItem(table, JSON.stringify(a)); 
-    await refreshAll(); notifyRealtimeChange(); return true; 
+    await refreshAll(); return true; 
   }
   try {
     let {error} = await sb.from(table).delete().eq('id', id);
-    if(error) {
-      let a = await dbGet(table); a = a.filter(x => x.id !== id); localStorage.setItem(table, JSON.stringify(a));
-    }
-    await refreshAll();
-    notifyRealtimeChange();
+    if(error) throw error;
     return true;
   } catch(e) {
     let a = await dbGet(table); a = a.filter(x => x.id !== id); localStorage.setItem(table, JSON.stringify(a));
     await refreshAll();
-    notifyRealtimeChange();
     return true;
   }
 }
@@ -349,6 +312,7 @@ async function refreshAll() {
   const rawTables = await dbGet('uwu_tables');
   const rawMenus = await dbGet('uwu_menus');
   const rawOrders = await dbGet('uwu_orders');
+  const rawStaff = await dbGet('uwu_staff');
 
   tables = rawTables.map(t => {
     let hasOrder = rawOrders.find(o => String(o.table_id) === String(t.id) && (o.status === 'กำลังทำ' || o.status === 'พร้อมเสิร์ฟ' || o.status === 'รออาหาร'));
@@ -374,14 +338,8 @@ async function refreshAll() {
 
   orders = [];
   completedOrders = [];
-  let foundStaff = false;
 
   rawOrders.forEach(o => {
-    if (o.status === 'UWU_STAFF') {
-      try { staff = JSON.parse(o.items || '[]'); foundStaff = true; } catch(e){}
-      return;
-    }
-
     let itemsArr = [];
     try { itemsArr = JSON.parse(o.items || '[]'); } catch(e){}
     let itemsText = itemsArr.map(it => `${it.name} ×${it.qty}`).join(', ');
@@ -408,7 +366,16 @@ async function refreshAll() {
     }
   });
 
-  if (!foundStaff && staff.length === 0) {
+  staff = rawStaff.map(s => ({
+    dbId: s.id,
+    name: s.name,
+    role: s.role,
+    status: s.status,
+    attendance: s.attendance,
+    attendanceTime: s.attendance_time || '-'
+  }));
+
+  if (staff.length === 0) {
     staff = [
       { name: "Mimi", role: "ผู้จัดการ", status: "กำลังทำงาน", attendance: "เข้าเวร", attendanceTime: "-" },
       { name: "Mochi", role: "พนักงานเสิร์ฟ", status: "กำลังทำงาน", attendance: "เข้าเวร", attendanceTime: "-" }
@@ -425,7 +392,6 @@ async function refreshAll() {
 
 window.onload = refreshAll;
 
-// Functions อื่นๆ สอดคล้องกับ Logic เดิม
 function todayISO(){return new Date().toISOString().slice(0,10)}
 function formatDate(date){ const d=new Date(date+"T00:00:00"); return d.toLocaleDateString("th-TH",{day:"2-digit",month:"2-digit",year:"numeric"}); }
 const titles={dashboard:"Dashboard",orders:"จัดการออเดอร์",menus:"จัดการเมนู",tables:"จัดการโต๊ะ",staff:"จัดการพนักงาน",manager:"ผู้จัดการ"};
@@ -545,15 +511,21 @@ function renderStaff(){
   const e=document.getElementById("staffTable");
   e.innerHTML=staff.map((s,i)=>`<tr><td>${s.name}</td><td>${s.role}</td><td><select class="status-select" onchange="changeStaffStatus(${i},this.value)"><option value="กำลังทำงาน" ${s.status==="กำลังทำงาน"?"selected":""}>🟢 กำลังทำงาน</option><option value="พัก" ${s.status==="พัก"?"selected":""}>🟡 พัก</option><option value="ลา" ${s.status==="ลา"?"selected":""}>🔴 ลา</option></select></td><td><select class="status-select" onchange="changeAttendance(${i},this.value)"><option value="ยังไม่เข้าเวร" ${(!s.attendance||s.attendance==="ยังไม่เข้าเวร")?"selected":""}>⚪ ยังไม่เข้าเวร</option><option value="เข้าเวร" ${s.attendance==="เข้าเวร"?"selected":""}>🟢 เข้าเวร</option><option value="ออกเวร" ${s.attendance==="ออกเวร"?"selected":""}>🔵 ออกเวร</option><option value="ลา" ${s.attendance==="ลา"?"selected":""}>🔴 ลา</option></select><div class="shift-time">${s.attendanceTime||"-"}</div></td><td class="staff-row-actions"><button class="btn edit-staff-btn" onclick="openStaffModal(${i})">แก้ไข</button><button class="btn danger" onclick="removeStaff(${i})">ลบ</button></td></tr>`).join("");
 }
-async function syncStaffToDb() {
-  const staffLogs = await dbGet('uwu_orders');
-  const staffRow = staffLogs.find(o => o.status === 'UWU_STAFF');
-  if (staffRow) { await dbUpdate('uwu_orders', staffRow.id, { items: JSON.stringify(staff) }); } 
-  else { await dbInsert('uwu_orders', { table_id: null, items: JSON.stringify(staff), total: 0, status: 'UWU_STAFF' }); }
+
+async function changeStaffStatus(i, status){
+  const s = staff[i];
+  await dbUpdate('uwu_staff', s.dbId, { status: status });
 }
-function changeStaffStatus(i,status){staff[i].status=status; renderStaff(); syncStaffToDb();}
-function changeAttendance(i,status){ staff[i].attendance=status; staff[i].attendanceTime = new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"}); renderStaff(); syncStaffToDb(); }
-function removeStaff(i){if(confirm("ลบพนักงานคนนี้ใช่ไหม?")){staff.splice(i,1); renderStaff(); syncStaffToDb();}}
+async function changeAttendance(i, status){ 
+  const s = staff[i];
+  const timeStr = new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"});
+  await dbUpdate('uwu_staff', s.dbId, { attendance: status, attendance_time: timeStr });
+}
+async function removeStaff(i){
+  if(confirm("ลบพนักงานคนนี้ใช่ไหม?")){
+    await dbDelete('uwu_staff', staff[i].dbId);
+  }
+}
 
 let editingStaffIndex=-1;
 function openStaffModal(index=-1){
@@ -567,9 +539,17 @@ function closeStaffModal(){document.getElementById("staffModal").classList.remov
 async function saveStaff(){
   const name=document.getElementById("staffName").value.trim();
   if(!name){alert("กรุณาใส่ชื่อพนักงานนะ 🐱");return}
-  const data={name,role:document.getElementById("staffRole").value,status:document.getElementById("staffStatus").value,attendance:document.getElementById("staffAttendance").value,attendanceTime:(editingStaffIndex>=0?staff[editingStaffIndex].attendanceTime:"-")};
-  if(editingStaffIndex<0) staff.push(data); else staff[editingStaffIndex]=data;
-  await syncStaffToDb(); renderStaff(); closeStaffModal();
+  const role = document.getElementById("staffRole").value;
+  const status = document.getElementById("staffStatus").value;
+  const attendance = document.getElementById("staffAttendance").value;
+  
+  if(editingStaffIndex < 0) {
+    await dbInsert('uwu_staff', { name, role, status, attendance, attendance_time: '-' });
+  } else {
+    const s = staff[editingStaffIndex];
+    await dbUpdate('uwu_staff', s.dbId, { name, role, status, attendance });
+  }
+  closeStaffModal();
 }
 
 const MANAGER_PASSWORD="1208";
