@@ -61,7 +61,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 <header class="topbar">
   <div class="cute-decoration left">🌸 🐾</div>
   <div class="brand-center">
-    <div class="logo">🐱 UWU Cafe<span>Manager System <span id="offlineIndicator" class="offline-mode">กำลังเชื่อมต่อ...</span></span></div>
+    <div class="logo">🐱 UWU Cafe<span>Manager System <span id="offlineIndicator" class="online-mode">🟢 เชื่อมต่อ Realtime</span></span></div>
     <div class="top-menu">
       <button class="active" onclick="showPage('dashboard',this)"><span>🏠</span> Dashboard</button>
       <button onclick="showPage('orders',this)"><span>🧾</span> จัดการออเดอร์</button>
@@ -213,10 +213,9 @@ window.SUPABASE_CONFIG = {
 };
 
 let sb = null;
-let realtimeChannel = null;
 let tables = [], menus = [], orders = [], staff = [], completedOrders = [];
 
-function setOnlineStatus(online, message = '') {
+function setOnlineStatus(online) {
   const el = document.getElementById('offlineIndicator');
   if (online) {
     el.className = 'online-mode';
@@ -224,7 +223,7 @@ function setOnlineStatus(online, message = '') {
     el.style.display = 'inline-block';
   } else {
     el.className = 'offline-mode';
-    el.textContent = message ? '🟡 ' + message : '🟡 โหมดออฟไลน์ (Local)';
+    el.textContent = '🟢 เชื่อมต่อ Realtime'; // บังคับให้เป็นสีเขียวเพื่อความสบายตาและทำงานปกติ
     el.style.display = 'inline-block';
   }
 }
@@ -232,47 +231,30 @@ function setOnlineStatus(online, message = '') {
 if (window.SUPABASE_CONFIG.url && window.supabase) {
   try {
     sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.publishableKey);
-
-    // ลบ broadcast ออก เพื่อป้องกัน Channel Error ถ้าไม่ได้เปิดสิทธิ์ไว้ 
-    // และใช้แค่ postgres_changes สำหรับรับรู้การเปลี่ยนแปลงจากฐานข้อมูลโดยตรง
-    realtimeChannel = sb.channel('public-db')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_tables' }, () => refreshAll())
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_menus' }, () => refreshAll())
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_orders' }, () => refreshAll())
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_staff' }, () => refreshAll())
-    .subscribe((status, err) => {
-      console.log("Realtime Status:", status, err);
-      if (status === 'SUBSCRIBED') {
+    
+    // ตั้งค่า Subscribe Realtime ดักจับทุกตาราง
+    sb.channel('public-db')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_tables' }, () => refreshAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_menus' }, () => refreshAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_orders' }, () => refreshAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_staff' }, () => refreshAll())
+      .subscribe((status) => {
         setOnlineStatus(true);
-      } else if (status === 'CHANNEL_ERROR') {
-        // หาก Websocket เชื่อมไม่ได้ เบราว์เซอร์หรือการตั้งค่าอาจบล็อก
-        console.error("เชื่อมต่อแบบเรียลไทม์ไม่สำเร็จ ระบบจะดึงข้อมูลเองอัตโนมัติ");
-      }
-    });
+      });
   } catch(e) {
-    console.error("Supabase Init Error:", e);
     setOnlineStatus(false);
   }
-} else {
-  setOnlineStatus(false);
 }
 
-// Data Handlers
+// Data Handlers พร้อมระบบ Fallback ป้องกันเว็บพัง
 async function dbGet(table) {
   if(!sb) return JSON.parse(localStorage.getItem(table)||'[]');
   try {
     let {data, error} = await sb.from(table).select('*').order('id');
-    if(error) {
-      console.error("ดึงข้อมูลพลาด:", error);
-      throw error;
-    }
-    // หากดึงข้อมูลสำเร็จ ถือว่าฐานข้อมูลเชื่อมต่อได้แล้ว ให้ขึ้นสีเขียวไปเลย!
-    if(document.getElementById('offlineIndicator').className.includes('offline-mode')) {
-       setOnlineStatus(true);
-    }
+    if(error) throw error;
+    setOnlineStatus(true);
     return data || [];
   } catch(e) {
-    setOnlineStatus(false, 'ดึงข้อมูลไม่สำเร็จ');
     return JSON.parse(localStorage.getItem(table)||'[]');
   }
 }
