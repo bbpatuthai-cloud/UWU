@@ -215,15 +215,18 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
   <div class="card"><small>เมนูขายดี</small><div class="value" id="topSellingItem">🍓 -</div></div>
  </div>
 
- <!-- ส่วนจัดการรายชื่อพนักงาน ย้ายมาอยู่ในหน้าผู้จัดการ -->
+ <!-- ส่วนจัดการรายชื่อพนักงาน ย้ายมาอยู่ในหน้าผู้จัดการ พร้อมปุ่มรีเฟรช -->
  <div class="panel" style="margin-top:15px;">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
     <h2>👥 จัดการรายชื่อพนักงาน</h2>
-    <button class="btn" onclick="openStaffModal()">＋ เพิ่มพนักงาน</button>
+    <div style="display:flex; gap:8px;">
+      <button class="btn secondary" onclick="refreshAll()">↻ รีเฟรชข้อมูล</button>
+      <button class="btn" onclick="openStaffModal()">＋ เพิ่มพนักงาน</button>
+    </div>
   </div>
   <div class="scroll-table-wrap">
     <table>
-      <thead><tr><th>ชื่อพนักงาน</th><th>ตำแหน่ง</th><th>สถานะงาน</th><th>จัดการ</th></tr></thead>
+      <thead><tr><th>ชื่อพนักงาน</th><th>ตำแหน่ง</th><th>การเข้า-ออกเวรจริง</th><th>จัดการ</th></tr></thead>
       <tbody id="managerStaffManagerTable"></tbody>
     </table>
   </div>
@@ -342,8 +345,6 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
   <input id="staffName" placeholder="เช่น Mallow">
   <label>💼 ตำแหน่ง</label>
   <select id="staffRole"><option>ผู้จัดการ</option><option>พนักงานเสิร์ฟ</option><option>พนักงานครัว</option><option>แคชเชียร์</option></select>
-  <label>💗 สถานะการทำงาน</label>
-  <select id="staffStatus"><option value="กำลังทำงาน">🟢 กำลังทำงาน</option><option value="พัก">🟡 พัก</option><option value="ลา">🔴 ลา</option></select>
   <div class="modal-actions">
     <button class="btn secondary" onclick="closeStaffModal()">✕ ยกเลิก</button>
     <button class="btn" onclick="saveStaff()">🐾 บันทึก</button>
@@ -675,7 +676,7 @@ function editMenu(i){
 }
 async function saveMenu(){
   let n=document.getElementById("menuName").value.trim(), p=Number(document.getElementById("menuPrice").value), c=document.getElementById("menuCat").value, img=document.getElementById("menuImage").value.trim();
-  if(!n||!p)return alert("กรอกชื่อเมนูและราคาให้ครบ 🐱");
+  if(!n||!p)return alert("กรอกชื่อและราคาให้ครบ 🐱");
   let extraDesc = JSON.stringify({ cat: c, icon: c==="เครื่องดื่ม"?"🧋":"🍰", image: img });
   if (editingMenuDbId !== -1) { await dbUpdate('uwu_menus', editingMenuDbId, { name: n, price: p, description: extraDesc }); } 
   else { await dbInsert('uwu_menus', { name: n, price: p, description: extraDesc }); }
@@ -765,7 +766,7 @@ function renderStaff(){
   }).join("");
 }
 
-// หน้าผู้จัดการ: จัดการรายชื่อพนักงาน แก้ไข / ลบ (แสดงเฉพาะสถานะงาน)
+// หน้าผู้จัดการ: จัดการรายชื่อพนักงาน แก้ไข / ลบ (แสดงการเข้า-ออกเวรจริง)
 function renderManagerStaffTable() {
   const tbody = document.getElementById("managerStaffManagerTable");
   if (!tbody) return;
@@ -773,23 +774,12 @@ function renderManagerStaffTable() {
   tbody.innerHTML = staff.map((s, i) => `<tr>
     <td><b>${s.name}</b></td>
     <td>${s.role}</td>
-    <td>
-      <select class="status-select" onchange="changeStaffStatus(${i},this.value)">
-        <option value="กำลังทำงาน" ${s.status==="กำลังทำงาน"?"selected":""}>🟢 กำลังทำงาน</option>
-        <option value="พัก" ${s.status==="พัก"?"selected":""}>🟡 พัก</option>
-        <option value="ลา" ${s.status==="ลา"?"selected":""}>🔴 ลา</option>
-      </select>
-    </td>
+    <td><span class="status ${s.attendance === 'เข้าเวร' ? 'green' : 'blue'}">${s.attendance === 'เข้าเวร' ? '🟢 เข้าเวร' : '🔵 ออกเวร'}</span></td>
     <td class="staff-row-actions">
       <button class="btn edit-staff-btn" onclick="openStaffModal(${i})">แก้ไข</button>
       <button class="btn danger" onclick="removeStaff(${i})">ลบ</button>
     </td>
   </tr>`).join("");
-}
-
-async function changeStaffStatus(i, status){
-  const s = staff[i];
-  if(s.dbId) await dbUpdate('uwu_staff', s.dbId, { status: status });
 }
 
 async function removeStaff(i){
@@ -803,7 +793,7 @@ function openStaffModal(index=-1){
   editingStaffIndex=index;
   document.getElementById("staffModalTitle").textContent=index<0?"เพิ่มพนักงานใหม่":"แก้ไขข้อมูลพนักงาน";
   const s=index<0?{name:"",role:"พนักงานเสิร์ฟ",status:"กำลังทำงาน"}:staff[index];
-  document.getElementById("staffName").value=s.name; document.getElementById("staffRole").value=s.role; document.getElementById("staffStatus").value=s.status;
+  document.getElementById("staffName").value=s.name; document.getElementById("staffRole").value=s.role;
   document.getElementById("staffModal").classList.add("show");
 }
 function closeStaffModal(){document.getElementById("staffModal").classList.remove("show");editingStaffIndex=-1}
@@ -811,13 +801,12 @@ async function saveStaff(){
   const name=document.getElementById("staffName").value.trim();
   if(!name){alert("กรุณาใส่ชื่อพนักงานนะ 🐱");return}
   const role = document.getElementById("staffRole").value;
-  const status = document.getElementById("staffStatus").value;
   
   if(editingStaffIndex < 0) {
-    await dbInsert('uwu_staff', { name, role, status, attendance: 'ออกเวร', attendance_time: '-' });
+    await dbInsert('uwu_staff', { name, role, status: 'กำลังทำงาน', attendance: 'ออกเวร', attendance_time: '-' });
   } else {
     const s = staff[editingStaffIndex];
-    if(s.dbId) await dbUpdate('uwu_staff', s.dbId, { name, role, status });
+    if(s.dbId) await dbUpdate('uwu_staff', s.dbId, { name, role });
   }
   closeStaffModal();
 }
