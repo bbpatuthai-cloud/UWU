@@ -243,15 +243,16 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
   </div>
  </div>
 
+ <!-- ปรับปรุงส่วนนี้: สรุปยอดขายรายเดือน (คลิกดูสถิติตายตัวรายวันได้) -->
  <div class="panel">
   <div style="display:flex; justify-content:space-between; align-items:center;">
-    <h2>💾 บันทึกยอดประจำวัน</h2>
+    <h2>📅 สรุปยอดขายรายเดือน (Monthly Summary)</h2>
     <button class="btn" onclick="saveDailySummary()">💾 บันทึกสรุปยอดวันนี้</button>
   </div>
   <div class="scroll-table-wrap">
     <table>
-      <thead><tr><th>วันที่บันทึก</th><th>ยอดขายรวม</th><th>จำนวนออเดอร์</th><th>เมนูขายดี</th></tr></thead>
-      <tbody id="dailySummaryTable"></tbody>
+      <thead><tr><th>เดือน / ปี</th><th>ยอดขายรวมทั้งเดือน</th><th>จำนวนออเดอร์รวม</th><th>การจัดการ</th></tr></thead>
+      <tbody id="monthlySummaryTable"></tbody>
     </table>
   </div>
  </div>
@@ -348,6 +349,31 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
   <div class="modal-actions">
     <button class="btn secondary" onclick="closeStaffModal()">✕ ยกเลิก</button>
     <button class="btn" onclick="saveStaff()">🐾 บันทึก</button>
+  </div>
+</div></div>
+
+<!-- Modal ดูสรุปยอดรายวันย่อยในแต่ละเดือน -->
+<div class="modal" id="dailyDetailModal" onclick="if(event.target===this)closeDailyDetailModal()">
+<div class="modal-card-box order-modal-large">
+  <div class="modal-cat-icon">📊</div>
+  <div class="modal-title-text"><span id="dailyDetailModalTitle">รายละเอียดสรุปยอดรายวัน</span></div>
+  <div class="modal-sub-text">เหมียว~ สรุปรายวันสำหรับเดือนที่เลือกนะ 💕</div>
+  <div class="scroll-table-wrap" style="max-height:350px;">
+    <table>
+      <thead>
+        <tr>
+          <th>วันที่</th>
+          <th>ยอดขายรวม</th>
+          <th>จำนวนออเดอร์</th>
+          <th>เมนูขายดี</th>
+          <th>จัดการ</th>
+        </tr>
+      </thead>
+      <tbody id="dailyDetailTable"></tbody>
+    </table>
+  </div>
+  <div class="modal-actions">
+    <button class="btn secondary" style="width:100%" onclick="closeDailyDetailModal()">ปิดหน้าต่าง</button>
   </div>
 </div></div>
 
@@ -505,7 +531,6 @@ function getLocalISO(d = new Date()) {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
-// แปลงฟอร์แมตเมนูในรายการออเดอร์ให้โชว์เฉพาะชื่อและจำนวนอาหาร
 function formatOrderItemsText(rawItems) {
   if (!rawItems) return '-';
   try {
@@ -581,7 +606,7 @@ async function refreshAll() {
   renderManagerData();
   renderAttendanceList();
   renderLiveShiftTimes();
-  renderDailySummaries();
+  renderMonthlySummaries();
   updateDash();
 }
 
@@ -720,7 +745,6 @@ function renderStaffSelectOptions() {
   if (currentVal) select.value = currentVal;
 }
 
-// โครงสร้างบันทึกเวลา 77 STAR
 async function clockInOut(type) {
   const select = document.getElementById("staffNameSelect");
   const name = select.value;
@@ -756,7 +780,6 @@ function filterMyAttendance() {
   renderAttendanceList();
 }
 
-// หน้าเข้า-ออกเวร: แสดงเฉพาะพนักงานที่กำลังเข้าเวรอยู่เท่านั้น
 function renderStaff(){
   const e=document.getElementById("staffTable");
   if(!e) return;
@@ -778,7 +801,6 @@ function renderStaff(){
   }).join("");
 }
 
-// หน้าผู้จัดการ: จัดการรายชื่อพนักงาน แก้ไข / ลบ (แสดงการเข้า-ออกเวรจริง)
 function renderManagerStaffTable() {
   const tbody = document.getElementById("managerStaffManagerTable");
   if (!tbody) return;
@@ -844,7 +866,6 @@ function renderManagerData(){
   </tr>`).join("");
 }
 
-// สรุปประวัติบันทึกการลงเวลา และการคำนวณชั่วโมงทำงานตามโครงสร้าง 77 STAR
 function renderAttendanceList() {
   const mgrListEl = document.getElementById("attendanceList");
   const staffLogEl = document.getElementById("staffAttendanceLog");
@@ -906,7 +927,6 @@ function renderAttendanceList() {
   }
 }
 
-// สรุปชั่วโมงทำงานพนักงาน สไตล์ 77 STAR
 function renderWorkHoursSummary(logs) {
   const summaryEl = document.getElementById("workHoursSummaryList");
   if (!summaryEl) return;
@@ -1000,7 +1020,6 @@ async function deleteDayWorkLog(dateKey, name, ids) {
   }
 }
 
-// ตัวนับเวลานับเดินหน้า Realtime แบบเรียลไทม์
 function renderLiveShiftTimes() {
   const clockOrders = orders.filter(o => o.status === 'CLOCK_LOG');
   const now = Date.now();
@@ -1053,20 +1072,118 @@ async function saveDailySummary() {
   }
 }
 
-function renderDailySummaries() {
-  const tbody = document.getElementById("dailySummaryTable");
+// ระบบจัดกลุ่มข้อมูลเปนรายเดือน
+function renderMonthlySummaries() {
+  const tbody = document.getElementById("monthlySummaryTable");
   if(!tbody) return;
+
   if(dailySummaries.length === 0) {
     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#a17f90; padding:20px;">ยังไม่มีประวัติการบันทึกยอด</td></tr>';
     return;
   }
-  const sorted = [...dailySummaries].sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
-  tbody.innerHTML = sorted.map(d => `<tr>
-    <td>${formatDate(d.date)}</td>
-    <td><b>฿${Number(d.total_sales||0).toLocaleString("th-TH")}</b></td>
-    <td>${d.order_count||0} ออเดอร์</td>
-    <td>${d.top_item||"-"}</td>
-  </tr>`).join("");
+
+  // จัดกลุ่มข้อมูลแยกตาม เดือน-ปี (เช่น "2026-08")
+  const monthGroups = {};
+  dailySummaries.forEach(d => {
+    const monthKey = d.date ? d.date.slice(0, 7) : 'ไม่ระบุ';
+    if(!monthGroups[monthKey]) {
+      monthGroups[monthKey] = {
+        monthKey: monthKey,
+        totalSales: 0,
+        totalOrders: 0,
+        days: []
+      };
+    }
+    monthGroups[monthKey].totalSales += Number(d.total_sales || 0);
+    monthGroups[monthKey].totalOrders += Number(d.order_count || 0);
+    monthGroups[monthKey].days.push(d);
+  });
+
+  const sortedMonths = Object.keys(monthGroups).sort().reverse();
+
+  tbody.innerHTML = sortedMonths.map(mKey => {
+    const group = monthGroups[mKey];
+    const dateObj = new Date(mKey + "-01T00:00:00");
+    const monthName = isNaN(dateObj.getTime()) ? mKey : dateObj.toLocaleDateString("th-TH", { month: "long", year: "numeric" });
+
+    return `<tr>
+      <td><b>📅 ${monthName}</b></td>
+      <td><b style="color:#d65f91">฿${group.totalSales.toLocaleString("th-TH")}</b></td>
+      <td>${group.totalOrders.toLocaleString("th-TH")} ออเดอร์</td>
+      <td>
+        <button class="btn" style="padding:6px 12px; font-size:12px" onclick="openDailyDetailModal('${mKey}')">🔍 ดูรายละเอียดรายวัน</button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+// เปิด Modal ดูสรุปยอดขายรายวันของเดือนที่เลือก
+function openDailyDetailModal(monthKey) {
+  const dateObj = new Date(monthKey + "-01T00:00:00");
+  const monthName = isNaN(dateObj.getTime()) ? monthKey : dateObj.toLocaleDateString("th-TH", { month: "long", year: "numeric" });
+  
+  document.getElementById("dailyDetailModalTitle").textContent = `สรุปยอดขายรายวัน (${monthName})`;
+  
+  const daysInMonth = dailySummaries.filter(d => d.date && d.date.startsWith(monthKey)).sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
+  const tbody = document.getElementById("dailyDetailTable");
+
+  if(daysInMonth.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#a17f90">ไม่มีข้อมูลย่อยของเดือนนี้</td></tr>';
+  } else {
+    tbody.innerHTML = daysInMonth.map(d => `<tr>
+      <td><b>${formatDate(d.date)}</b></td>
+      <td style="color:#d65f91; font-weight:bold">฿${Number(d.total_sales||0).toLocaleString("th-TH")}</td>
+      <td>${d.order_count||0} ออเดอร์</td>
+      <td>${d.top_item||"-"}</td>
+      <td>
+        <button class="btn secondary" style="padding:4px 8px; font-size:12px" onclick="viewDayItemsDetail('${d.date}')">🔍 รายการอาหาร</button>
+        <button class="btn danger" style="padding:4px 8px; font-size:12px; margin-left:4px;" onclick="deleteDailySummary(${d.id})">ลบ</button>
+      </td>
+    </tr>`).join("");
+  }
+
+  document.getElementById("dailyDetailModal").classList.add("show");
+}
+
+function closeDailyDetailModal() {
+  document.getElementById("dailyDetailModal").classList.remove("show");
+}
+
+async function deleteDailySummary(id) {
+  if(confirm("ต้องการลบประวัติสรุปยอดประจำวันนี้ใช่หรือไม่?")) {
+    await dbDelete('uwu_daily_summaries', id);
+    closeDailyDetailModal();
+    refreshAll();
+  }
+}
+
+// ดูรายการอาหารที่ขายได้ของวันนั้นๆ
+function viewDayItemsDetail(dateStr) {
+  const dayOrders = completedOrders.filter(o => o.date === dateStr);
+  const totalSales = dayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+
+  let html = `
+    <h3>🔍 สรุปรายการเมนูที่ขายได้วันที่ ${formatDate(dateStr)}</h3>
+    <div style="background:#fff0f6; padding:12px; border-radius:12px; margin-bottom:15px; color:#7e5c6d; border:1px solid #f8d5e5">
+      <div>ยอดขายรวม: <b style="color:#d65f91; font-size:18px;">฿${totalSales.toLocaleString('th-TH')}</b></div>
+      <div>จำนวนออเดอร์: <b>${dayOrders.length} ออเดอร์</b></div>
+    </div>
+  `;
+
+  if(!dayOrders.length){
+    html += '<div class="empty-order">ไม่มีออเดอร์ในวันที่เลือก</div>';
+  } else {
+    html += `<div class="selected-order-items" style="max-height:280px">`;
+    dayOrders.forEach(o => {
+      html += `<div class="selected-order-item">
+        <div><b>ออเดอร์ ${o.id} (${o.table})</b><br><small>${o.items}</small></div>
+        <strong>฿${Number(o.total||0).toLocaleString('th-TH')}</strong>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  alert(`สรุปเมนูที่ขายได้วันที่ ${formatDate(dateStr)}\nรวมทั้งสิ้น: ฿${totalSales.toLocaleString('th-TH')} (${dayOrders.length} ออเดอร์)`);
 }
 
 function updateDash(){
