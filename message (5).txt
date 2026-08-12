@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>UWU Cafe Manager</title>
+<!-- นำเข้า Supabase สำหรับระบบออนไลน์ Realtime -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans Thai",sans-serif;background:#fff7fb;color:#4b3842}
+.app{min-height:100vh}.main{width:100%;padding:0 28px 40px}.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:center;min-height:154px;padding:18px 24px 14px;background:rgba(255,247,251,.96);backdrop-filter:blur(12px);border-bottom:1px solid #f2dce6;box-shadow:0 8px 25px rgba(214,95,145,.08)}.brand-center{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;max-width:1180px}.logo{text-align:center;font-size:28px;font-weight:800;color:#e88bb2}.logo span{font-size:13px;display:block;color:#9c7c8b;font-weight:400;margin-top:2px}.top-menu{display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap}.top-menu button{border:1px solid #f0d3e0;background:#fff;border-radius:18px;padding:10px 14px;font-size:14px;color:#67515c;cursor:pointer;box-shadow:0 4px 12px rgba(214,95,145,.06);transition:.18s}.top-menu button span{margin-right:5px}.top-menu button:hover,.top-menu button.active{background:#ffe3ef;border-color:#f4bdd4;color:#d65f91;font-weight:700;transform:translateY(-1px)}.cute-decoration{position:absolute;top:24px;font-size:24px;letter-spacing:5px;opacity:.9}.cute-decoration.left{left:28px}.cute-decoration.right{right:28px}.page-heading{display:flex;justify-content:space-between;align-items:center;max-width:1320px;margin:28px auto 25px}.page-heading h1{margin:0;font-size:28px}.badge{background:#ffe5f0;padding:8px 14px;border-radius:20px;color:#d65f91}
+.page{display:none}.page.active{display:block}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.card{background:white;border:1px solid #f2dce6;border-radius:20px;padding:20px;box-shadow:0 5px 20px #e8b9cc22}.card small{color:#987d88}.value{font-size:28px;font-weight:800;margin-top:8px}
+.panel{background:white;border:1px solid #f2dce6;border-radius:20px;padding:20px;margin-top:20px}.panel h2{margin-top:0;font-size:19px}.btn{border:0;background:#e98bb3;color:white;padding:10px 15px;border-radius:12px;cursor:pointer;font-weight:700}.btn.secondary{background:#ffe5f0;color:#c85e88}.btn.danger{background:#f28b9e}.actions{display:flex;gap:8px;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10px;border-bottom:1px solid #f2e4ea}th{color:#9a7d89;font-size:13px}.status{padding:5px 10px;border-radius:15px;font-size:12px;background:#ffe9f1;color:#d45d8c}
+.status-select{min-width:145px;padding:9px 12px;border:1px solid #f0cddd;border-radius:12px;background:#fff7fb;color:#c85e88;font-size:13px;font-weight:700;cursor:pointer;outline:none}
+.status-select:focus{border-color:#e88bb2;box-shadow:0 0 0 3px #ffe5f0}
+.status.green{background:#e8f8ef;color:#45946b}.status.yellow{background:#fff4d9;color:#a9781d}.status.gray{background:#eee;color:#777}
+.menu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.menu-item{border:1px solid #f1dce5;border-radius:18px;padding:16px;background:#fff}.menu-img{height:130px;border-radius:14px;background:#fff0f6;display:flex;align-items:center;justify-content:center;font-size:52px;margin-bottom:12px}.price{color:#d65f91;font-weight:800}
+.menu-form-box{width:min(500px,calc(100% - 32px));max-height:90vh;overflow:auto}
+.menu-image-preview{margin:10px 0 4px;border:2px dashed #f0cada;border-radius:16px;background:#fff8fc;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#b58b9d;overflow:hidden}
+.menu-image-preview img{width:100%;height:180px;object-fit:cover;display:block}
+.menu-image-preview span{font-size:38px}
+.menu-image-preview small{font-size:12px}
+.menu-img img{width:100%;height:100%;object-fit:cover;border-radius:14px;display:block}
+.modal{position:fixed;inset:0;background:#4b384288;display:none;align-items:center;justify-content:center;padding:20px;z-index:100}.modal.show{display:flex}.cute-menu-editor{width:min(520px,calc(100% - 32px));max-height:90vh;overflow:auto;border:2px solid #ffd7e8;box-shadow:0 24px 70px rgba(126,70,100,.25);position:relative}
+.editor-cat{width:76px;height:76px;margin:-4px auto 10px;border-radius:26px;background:#ffe4f0;display:flex;align-items:center;justify-content:center;font-size:42px;box-shadow:0 8px 20px rgba(226,120,165,.18)}
+.editor-title{text-align:center;font-size:24px;font-weight:800;color:#d95e91}
+.editor-subtitle{text-align:center;color:#a17f90;font-size:13px;margin:5px 0 22px}
+.editor-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+.editor-actions .btn{min-width:110px}
+.modal-box{background:#fff;border-radius:22px;padding:24px;width:min(500px,100%)}input,select{width:100%;padding:11px;border:1px solid #ead6df;border-radius:11px;margin:6px 0 14px;font-size:15px}label{font-size:13px;color:#806a75}
+.order-modal-large{width:min(560px,calc(100% - 32px));max-height:90vh;overflow:auto}
+.menu-picker{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center}
+.menu-picker select{margin:0!important}
+.qty-control{display:flex;align-items:center;border:2px solid #f3d4e2;border-radius:15px;background:#fff;height:48px;overflow:hidden}
+.qty-control button{border:0;background:#fff0f6;color:#d65f91;width:38px;height:100%;font-size:20px;font-weight:800;cursor:pointer}
+.qty-control span{min-width:30px;text-align:center;font-weight:800;color:#6e4e60}
+.add-item-btn{white-space:nowrap!important;height:48px!important;padding:0 14px!important}
+.selected-title{margin-top:18px;color:#7e5c6d;font-weight:800;font-size:13px}
+.selected-order-items{margin-top:8px;border:1px solid #f3d4e2;border-radius:15px;background:#fffafd;padding:8px;max-height:150px;overflow:auto}
+.selected-order-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-bottom:1px solid #f7e7ee}
+.selected-order-item:last-child{border-bottom:0}
+.selected-order-item .item-info{flex:1}
+.selected-order-item b{color:#6e4e60}
+.selected-order-item small{color:#a07f8e}
+.remove-item{border:0;background:#ffe8f1;color:#d65f91;border-radius:9px;padding:5px 8px;cursor:pointer}
+.empty-order{text-align:center;color:#aa8c99;padding:14px}
+.order-total{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:13px 15px;border-radius:15px;background:#fff0f6;color:#7e5c6d}
+.order-total strong{font-size:20px;color:#d65f91}
+@media(max-width:600px){.menu-picker{grid-template-columns:1fr auto}.add-item-btn{grid-column:1/-1}.order-modal-large{padding:22px}}
+.order-modal-box{width:min(430px,calc(100% - 32px));background:linear-gradient(180deg,#fffaff 0%,#fff 100%);border:2px solid #f6cde0;border-radius:28px;padding:30px;box-shadow:0 24px 70px rgba(180,95,140,.28);position:relative;overflow:hidden;animation:catPop .22s ease-out}.order-modal-box:before,.order-modal-box:after{content:"";position:absolute;top:-12px;width:90px;height:90px;background:#ffe5f0;border-radius:50%}.order-modal-box:before{left:-35px}.order-modal-box:after{right:-35px}@keyframes catPop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}.cat-face{width:78px;height:78px;margin:-5px auto 12px;border-radius:28px;background:#ffd9e9;display:flex;align-items:center;justify-content:center;font-size:48px;position:relative;z-index:1;box-shadow:0 8px 20px rgba(232,139,178,.18)}.order-modal-box h2{text-align:center;color:#d96598;margin:5px 0 6px;font-size:24px}.order-sub{text-align:center;color:#9c7b8b;font-size:13px;margin-bottom:22px}.order-modal-box label{display:block;color:#7e5c6d;font-weight:700;font-size:13px;margin-bottom:8px}.order-modal-box select{width:100%;padding:13px 15px;border:2px solid #f3d4e2;border-radius:15px;background:#fff;color:#6e4e60;font-size:15px;outline:none}.order-modal-box select:focus{border-color:#e88bb2;box-shadow:0 0 0 4px #ffeaf3}.order-actions{display:flex;gap:10px;margin-top:22px}.order-actions button{flex:1;padding:12px;border-radius:14px}.btn-cancel{background:#fff0f6!important;color:#c85e88!important;border:1px solid #f3cadd!important}.btn-confirm{background:#e88bb2!important;color:white!important;box-shadow:0 7px 16px rgba(232,139,178,.22)} .staff-modal-box{width:min(500px,calc(100% - 32px));background:linear-gradient(180deg,#fff8fc,#ffffff);border:2px solid #ffd4e6;border-radius:30px;padding:30px;box-shadow:0 28px 80px rgba(180,95,140,.30);position:relative;overflow:hidden;animation:catPop .22s ease-out}.staff-modal-box:before,.staff-modal-box:after{content:"";position:absolute;width:95px;height:95px;background:#ffe6f1;border-radius:50%;top:-28px;z-index:0}.staff-modal-box:before{left:-38px}.staff-modal-box:after{right:-38px}.staff-modal-close{position:absolute;right:16px;top:14px;width:38px;height:38px;border:0;border-radius:50%;background:#f38ab4;color:#fff;font-size:22px;cursor:pointer;z-index:3}.staff-cat{position:relative;z-index:2;width:78px;height:78px;margin:-8px auto 10px;border-radius:28px;background:#ffdce9;display:flex;align-items:center;justify-content:center;font-size:46px;box-shadow:0 9px 22px rgba(232,139,178,.20)}.staff-title{text-align:center;color:#d85f92;font-size:25px;font-weight:800;position:relative;z-index:2}.staff-sub{text-align:center;color:#a17f90;font-size:13px;margin:5px 0 22px}.staff-modal-box label{display:block;margin:10px 0 5px;font-weight:700;color:#7c5b6c}.staff-modal-box input,.staff-modal-box select{border:2px solid #f2d5e2;border-radius:15px;padding:13px 15px;background:#fff}.staff-modal-box input:focus,.staff-modal-box select:focus{outline:none;border-color:#e88bb2;box-shadow:0 0 0 4px #ffeaf3}.staff-actions{display:flex;gap:12px;margin-top:22px;border-top:2px dashed #f5dbe6;padding-top:18px}.staff-actions button{flex:1;padding:13px;border-radius:15px}.staff-cancel{background:#fff0f6!important;color:#c85e88!important;border:1px solid #f3cadd!important}.staff-save{background:#e86f9f!important;color:#fff!important;box-shadow:0 8px 18px rgba(232,111,159,.22)} .edit-staff-btn{margin-right:7px!important} .staff-row-actions{white-space:nowrap}.shift-time{font-size:11px;color:#a17f90;margin-top:4px;text-align:center}
+@media(max-width:800px){.main{padding:0 14px 30px}.topbar{min-height:150px;padding:14px 10px}.cute-decoration{display:none}.top-menu{gap:6px;overflow-x:auto;flex-wrap:nowrap;justify-content:flex-start;width:100%;padding:2px 4px 8px;scrollbar-width:none}.top-menu::-webkit-scrollbar{display:none}.top-menu button{white-space:nowrap;padding:9px 12px;font-size:13px}.page-heading{margin:20px auto}.cards{grid-template-columns:repeat(2,1fr)}.menu-grid{grid-template-columns:1fr}}
+.manager-login-box{width:min(430px,calc(100% - 32px));background:linear-gradient(180deg,#fff8fc 0%,#fff 100%);border:2px solid #ffd4e6;border-radius:30px;padding:30px;box-shadow:0 28px 80px rgba(180,95,140,.30);position:relative;overflow:hidden;animation:catPop .22s ease-out}.manager-login-box:before,.manager-login-box:after{content:"";position:absolute;width:95px;height:95px;background:#ffe6f1;border-radius:50%;top:-30px;z-index:0}.manager-login-box:before{left:-40px}.manager-login-box:after{right:-40px}.manager-lock{position:relative;z-index:2;width:78px;height:78px;margin:-7px auto 12px;border-radius:28px;background:#ffdce9;display:flex;align-items:center;justify-content:center;font-size:44px;box-shadow:0 9px 22px rgba(232,139,178,.20)}.manager-title{text-align:center;color:#d85f92;font-size:25px;font-weight:800;position:relative;z-index:2}.manager-sub{text-align:center;color:#a17f90;font-size:13px;margin:6px 0 22px;position:relative;z-index:2}.manager-login-box label{display:block;margin:10px 0 5px;font-weight:700;color:#7c5b6c}.manager-login-box input{border:2px solid #f2d5e2;border-radius:15px;padding:13px 15px;background:#fff}.manager-login-box input:focus{outline:none;border-color:#e88bb2;box-shadow:0 0 0 4px #ffeaf3}.manager-login-actions{display:flex;gap:12px;margin-top:20px}.manager-login-actions button{flex:1;padding:13px;border-radius:15px}.manager-cancel{background:#fff0f6!important;color:#c85e88!important;border:1px solid #f3cadd!important}.manager-enter{background:#e86f9f!important;color:#fff!important;box-shadow:0 8px 18px rgba(232,111,159,.22)}.manager-page-note{color:#9c7c8b;font-size:13px;margin-top:-12px;margin-bottom:18px}
+.offline-mode {background: #ffecb3; color: #795548; padding: 5px 15px; border-radius: 20px; font-size: 12px; margin-left: 10px; display: none; font-weight: bold;}
+</style>
+</head>
+<body>
+<div class="app">
+<main class="main">
+<header class="topbar">
+  <div class="cute-decoration left">🌸 🐾</div>
+  <div class="brand-center">
+    <div class="logo">🐱 UWU Cafe<span>Manager System <span id="offlineIndicator" class="offline-mode">โหมดออฟไลน์</span></span></div>
+    <div class="top-menu">
+      <button class="active" onclick="showPage('dashboard',this)"><span>🏠</span> Dashboard</button>
+      <button onclick="showPage('orders',this)"><span>🧾</span> จัดการออเดอร์</button>
+      <button onclick="showPage('menus',this)"><span>🍰</span> จัดการเมนู</button>
+      <button onclick="showPage('tables',this)"><span>🪑</span> จัดการโต๊ะ</button>
+      <button onclick="showPage('staff',this)"><span>👥</span> จัดการพนักงาน</button>
+      <button onclick="openManagerLogin(this)"><span>👑</span> ผู้จัดการ</button>
+    </div>
+  </div>
+  <div class="cute-decoration right">🐾 💕</div>
+</header>
+<div class="page-heading"><h1 id="pageTitle">Dashboard</h1><div class="badge">♡ UWU Cafe</div></div>
+
+<section id="dashboard" class="page active">
+ <div class="panel">
+  <div class="top" style="display:flex; justify-content:space-between;"><h2>🧾 ออเดอร์ล่าสุด</h2><button class="btn secondary" onclick="refreshAll()">↻ ซิงค์ข้อมูล</button></div>
+  <table><thead><tr><th>วันที่</th><th>เลขที่ออเดอร์</th><th>โต๊ะ</th><th>รายการ</th><th>ยอดรวม</th><th>สถานะ</th></tr></thead><tbody id="dashOrders"></tbody></table></div>
+</section>
+
+<section id="orders" class="page">
+ <div class="panel"><div class="top" style="display:flex; justify-content:space-between;"><h2>จัดการออเดอร์</h2><button class="btn" onclick="newOrder()">＋ เพิ่มออเดอร์</button></div>
+ <table><thead><tr><th>เลขที่</th><th>โต๊ะ</th><th>รายการ</th><th>ยอดรวม</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="ordersTable"></tbody></table></div>
+</section>
+
+<section id="menus" class="page">
+ <div class="panel"><div class="top" style="display:flex; justify-content:space-between; margin-bottom: 20px;"><h2>จัดการเมนู</h2><button class="btn" onclick="openMenuModal()">＋ เพิ่มเมนู</button></div><div class="menu-grid" id="menuGrid"></div></div>
+</section>
+
+<section id="tables" class="page">
+ <div class="panel"><div class="top" style="display:flex; justify-content:space-between; margin-bottom: 20px;"><h2>จัดการโต๊ะ</h2><button class="btn" onclick="addTable()">＋ เพิ่มโต๊ะ</button></div><div class="menu-grid" id="tableGrid"></div></div>
+</section>
+
+<section id="staff" class="page">
+ <div class="panel"><div class="top" style="display:flex; justify-content:space-between; margin-bottom: 20px;"><h2>จัดการพนักงาน</h2><button class="btn" onclick="openStaffModal()">＋ เพิ่มพนักงาน</button></div>
+ <table><thead><tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>สถานะ</th><th>เข้า-ออกเวร / ลา</th><th>จัดการ</th></tr></thead><tbody id="staffTable"></tbody></table></div>
+</section>
+
+<section id="manager" class="page">
+ <div class="cards">
+  <div class="card"><small>ยอดขายวันนี้</small><div class="value" id="sales">฿0</div></div>
+  <div class="card"><small>ออเดอร์วันนี้</small><div class="value" id="orderCount">0</div></div>
+  <div class="card"><small>โต๊ะว่าง</small><div class="value" id="freeTables">0</div></div>
+  <div class="card"><small>เมนูขายดี</small><div class="value" id="topSellingItem">🍓 -</div></div>
+ </div>
+ <div class="manager-page-note" style="margin-top: 15px;">🔐 เฉพาะผู้จัดการเท่านั้น — ข้อมูลสรุปและประวัติออเดอร์ที่จบงานแล้วอยู่ในหน้านี้</div>
+ <div class="cards">
+  <div class="card"><small>ยอดขายจากงานที่จบแล้ว</small><div class="value" id="completedSales">฿0</div></div>
+  <div class="card"><small>ออเดอร์ที่จบแล้ว</small><div class="value" id="completedCount">0</div></div>
+  <div class="card"><small>ออเดอร์รอทำ</small><div class="value" id="pendingCount">0</div></div>
+ </div>
+ <div class="panel"><h2>📊 ประวัติออเดอร์ที่จบงานแล้ว</h2>
+  <table><thead><tr><th>วันที่</th><th>เลขที่</th><th>โต๊ะ</th><th>รายการ</th><th>ยอดรวม</th><th>สถานะ</th></tr></thead>
+  <tbody id="completedOrdersTable"></tbody></table>
+ </div>
+</section>
+</main>
+</div>
+
+<!-- Modal เพิ่มออเดอร์ -->
+<div class="modal" id="orderModal" onclick="if(event.target===this)closeOrderModal()">
+<div class="order-modal-box order-modal-large">
+<div class="cat-face">🐱</div>
+<h2>เพิ่มออเดอร์ใหม่</h2>
+<div class="order-sub">เหมียว~ เลือกโต๊ะและเมนูที่ลูกค้าสั่งนะ</div>
+
+<label for="orderTable">🪑 เลือกโต๊ะ</label>
+<select id="orderTable"></select>
+
+<label>🍰 เลือกเมนู</label>
+<div class="menu-picker">
+  <select id="orderMenu"></select>
+  <div class="qty-control">
+    <button type="button" onclick="changeOrderQty(-1)">−</button>
+    <span id="orderQty">1</span>
+    <button type="button" onclick="changeOrderQty(1)">＋</button>
+  </div>
+  <button type="button" class="btn add-item-btn" onclick="addOrderItem()">＋ เพิ่มรายการ</button>
+</div>
+
+<div class="selected-title">🐾 รายการที่เลือก</div>
+<div id="selectedOrderItems" class="selected-order-items">
+  <div class="empty-order">ยังไม่มีเมนูที่เลือก เหมียว~</div>
+</div>
+<div class="order-total"><span>ยอดรวม</span><strong id="orderTotal">฿0</strong></div>
+
+<div class="order-actions">
+<button class="btn btn-cancel" onclick="closeOrderModal()">ยกเลิก</button>
+<button class="btn btn-confirm" onclick="confirmNewOrder()">🐾 ยืนยันออเดอร์</button>
+</div>
+</div></div>
+
+<!-- Modal เพิ่ม/แก้ไข เมนู -->
+<div class="modal" id="menuModal" onclick="if(event.target===this)closeMenuModal()">
+<div class="modal-box menu-form-box cute-menu-editor">
+  <div class="editor-cat">🐱</div>
+  <div class="editor-title">🍰 <span id="menuModalTitle">เพิ่มเมนู</span></div>
+  <div class="editor-subtitle">เหมียว~ แก้ไขข้อมูลเมนูได้เลยนะ 💕</div>
+  <label>🏷️ ชื่อเมนู</label>
+  <input id="menuName" placeholder="เช่น Kitty Cloud Pancake">
+  <label>💰 ราคา</label>
+  <input id="menuPrice" type="number" min="0" placeholder="เช่น 159">
+  <label>🍰 หมวดหมู่</label>
+  <select id="menuCat"><option>ขนมหวาน</option><option>เครื่องดื่ม</option></select>
+  <label>🖼️ URL รูปเมนู</label>
+  <input id="menuImage" type="url" placeholder="https://example.com/cake.jpg" oninput="previewMenuImage()">
+  <div id="menuImagePreview" class="menu-image-preview">
+    <span>🐱</span><small>ใส่ URL รูปเพื่อดูตัวอย่าง</small>
+  </div>
+  <div class="actions editor-actions">
+    <button class="btn secondary" onclick="closeMenuModal()">ยกเลิก</button>
+    <button class="btn" onclick="saveMenu()">🐾 บันทึก</button>
+  </div>
+</div></div>
+
+<!-- Modal จัดการพนักงาน -->
+<div class="modal" id="staffModal" onclick="if(event.target===this)closeStaffModal()">
+<div class="staff-modal-box">
+ <button class="staff-modal-close" onclick="closeStaffModal()">×</button>
+ <div class="staff-cat">🐱</div>
+ <div class="staff-title"><span id="staffModalTitle">เพิ่มพนักงานใหม่</span> 🐾</div>
+ <div class="staff-sub">เหมียว~ กรอกข้อมูลพนักงานของเราได้เลยนะ 💕</div>
+ <label>👤 ชื่อพนักงาน</label>
+ <input id="staffName" placeholder="เช่น Mallow">
+ <label>💼 ตำแหน่ง</label>
+ <select id="staffRole"><option>ผู้จัดการ</option><option>พนักงานเสิร์ฟ</option><option>พนักงานครัว</option><option>แคชเชียร์</option></select>
+ <label>💗 สถานะ</label>
+ <select id="staffStatus"><option value="กำลังทำงาน">🟢 กำลังทำงาน</option><option value="พัก">🟡 พัก</option><option value="ลา">🔴 ลา</option></select>
+ <label>🕐 การเข้า-ออกเวร</label>
+ <select id="staffAttendance"><option value="ยังไม่เข้าเวร">⚪ ยังไม่เข้าเวร</option><option value="เข้าเวร">🟢 เข้าเวร</option><option value="ออกเวร">🔵 ออกเวร</option><option value="ลา">🔴 ลา</option></select>
+ <div class="staff-actions"><button class="btn staff-cancel" onclick="closeStaffModal()">✕ ยกเลิก</button><button class="btn staff-save" onclick="saveStaff()">🐾 บันทึก</button></div>
+</div></div>
+
+<!-- Modal ผู้จัดการ -->
+<div class="modal" id="managerLoginModal" onclick="if(event.target===this)closeManagerLogin()">
+ <div class="manager-login-box">
+  <div class="manager-lock">🔐</div>
+  <div class="manager-title">เข้าสู่โหมดผู้จัดการ 👑</div>
+  <div class="manager-sub">เหมียว~ กรุณาใส่รหัสผู้จัดการก่อนนะ 💕</div>
+  <label for="managerPassword">🔑 รหัสผู้จัดการ</label>
+  <input id="managerPassword" type="password" inputmode="numeric" placeholder="กรอกรหัสผู้จัดการ" onkeydown="if(event.key==='Enter')verifyManagerPassword()">
+  <div class="manager-login-actions">
+   <button class="btn manager-cancel" onclick="closeManagerLogin()">ยกเลิก</button>
+   <button class="btn manager-enter" onclick="verifyManagerPassword()">👑 เข้าสู่ผู้จัดการ</button>
+  </div>
+ </div>
+</div>
+
+<script>
+// ==========================================
+// ฐานข้อมูล Supabase Online Realtime 
+// ==========================================
+window.SUPABASE_CONFIG = {
+  url: "https://vehsmnstxrdzcrsrsgzr.supabase.co",
+  publishableKey: "sb_publishable_1ddU0deXdUTJCOOz6F52Ug_3xYtUNhP"
+};
+
+let sb = null;
+let realtimeChannel = null;
+
+if (window.SUPABASE_CONFIG.url && window.supabase) {
+  sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.publishableKey);
+  
+  // Realtime Broadcast Listener กระจายสัญญาณหาทุกเครื่องแบบ Real-time
+  realtimeChannel = sb.channel('uwu-realtime', { config: { broadcast: { self: true } } })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_tables' }, () => refreshAll())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_menus' }, () => refreshAll())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_orders' }, () => refreshAll())
+    .on('broadcast', { event: 'sync_event' }, () => refreshAll())
+    .subscribe();
+} else {
+  document.getElementById('offlineIndicator').style.display = 'inline-block';
+}
+
+// Data Arrays
+let tables = [], menus = [], orders = [], staff = [], completedOrders = [];
+
+// ฟังก์ชันส่งสัญญาณ Realtime หาเครื่องอื่นเมื่อมีการเปลี่ยนข้อมูล
+function notifyRealtimeChange() {
+  if (realtimeChannel) {
+    realtimeChannel.send({
+      type: 'broadcast',
+      event: 'sync_event',
+      payload: { timestamp: Date.now() }
+    });
+  }
+}
+
+// Safe DB Helper Functions
+async function dbGet(table) {
+  if(!sb) return JSON.parse(localStorage.getItem(table)||'[]');
+  try {
+    let {data, error} = await sb.from(table).select('*').order('id');
+    if(error) {
+      console.warn("Supabase Fetch Warning:", error.message);
+      document.getElementById('offlineIndicator').style.display='inline-block';
+      return JSON.parse(localStorage.getItem(table)||'[]');
+    }
+    document.getElementById('offlineIndicator').style.display='none';
+    return data || [];
+  } catch(e) {
+    document.getElementById('offlineIndicator').style.display='inline-block';
+    return JSON.parse(localStorage.getItem(table)||'[]');
+  }
+}
+
+async function dbInsert(table, row) {
+  if(!sb) { 
+    let a = await dbGet(table); row.id = Date.now(); a.push(row); 
+    localStorage.setItem(table, JSON.stringify(a)); 
+    refreshAll(); notifyRealtimeChange(); return row; 
+  }
+  try {
+    let {data, error} = await sb.from(table).insert(row).select().single();
+    if(error) {
+      console.warn("Supabase Insert Warning:", error.message);
+      let a = await dbGet(table); row.id = Date.now(); a.push(row); localStorage.setItem(table, JSON.stringify(a));
+    }
+    refreshAll();
+    notifyRealtimeChange();
+    return data;
+  } catch(e) {
+    let a = await dbGet(table); row.id = Date.now(); a.push(row); localStorage.setItem(table, JSON.stringify(a));
+    refreshAll();
+    notifyRealtimeChange();
+    return row;
+  }
+}
+
+async function dbUpdate(table, id, row) {
+  if(!sb) { 
+    let a = await dbGet(table); a = a.map(x => x.id === id ? {...x,...row} : x); 
+    localStorage.setItem(table, JSON.stringify(a)); 
+    refreshAll(); notifyRealtimeChange(); return true; 
+  }
+  try {
+    let {error} = await sb.from(table).update(row).eq('id', id);
+    if(error) {
+      console.warn("Supabase Update Warning:", error.message);
+      let a = await dbGet(table); a = a.map(x => x.id === id ? {...x,...row} : x); localStorage.setItem(table, JSON.stringify(a));
+    }
+    refreshAll();
+    notifyRealtimeChange();
+    return true;
+  } catch(e) {
+    let a = await dbGet(table); a = a.map(x => x.id === id ? {...x,...row} : x); localStorage.setItem(table, JSON.stringify(a));
+    refreshAll();
+    notifyRealtimeChange();
+    return true;
+  }
+}
+
+async function dbDelete(table, id) {
+  if(!sb) { 
+    let a = await dbGet(table); a = a.filter(x => x.id !== id); 
+    localStorage.setItem(table, JSON.stringify(a)); 
+    refreshAll(); notifyRealtimeChange(); return true; 
+  }
+  try {
+    let {error} = await sb.from(table).delete().eq('id', id);
+    if(error) {
+      console.warn("Supabase Delete Warning:", error.message);
+      let a = await dbGet(table); a = a.filter(x => x.id !== id); localStorage.setItem(table, JSON.stringify(a));
+    }
+    refreshAll();
+    notifyRealtimeChange();
+    return true;
+  } catch(e) {
+    let a = await dbGet(table); a = a.filter(x => x.id !== id); localStorage.setItem(table, JSON.stringify(a));
+    refreshAll();
+    notifyRealtimeChange();
+    return true;
+  }
+}
+
+// Data Fetch & Parse
+async function refreshAll() {
+  const rawTables = await dbGet('uwu_tables');
+  const rawMenus = await dbGet('uwu_menus');
+  const rawOrders = await dbGet('uwu_orders');
+
+  // Map Tables
+  tables = rawTables.map(t => {
+    let hasOrder = rawOrders.find(o => String(o.table_id) === String(t.id) && (o.status === 'กำลังทำ' || o.status === 'พร้อมเสิร์ฟ' || o.status === 'รออาหาร'));
+    return {
+      dbId: t.id,
+      id: t.name || ("T" + t.id),
+      status: hasOrder ? "มีลูกค้า" : "ว่าง"
+    };
+  });
+
+  // Map Menus
+  menus = rawMenus.map(m => {
+    let extra = { cat: 'ขนมหวาน', icon: '🍰', image: '' };
+    try { if (m.description && m.description.startsWith('{')) extra = JSON.parse(m.description); } catch(e){}
+    return {
+      dbId: m.id,
+      name: m.name,
+      price: m.price,
+      cat: extra.cat || 'ขนมหวาน',
+      icon: extra.icon || '🍰',
+      image: extra.image || ''
+    };
+  });
+
+  // Map Orders & Staff
+  orders = [];
+  completedOrders = [];
+  let foundStaff = false;
+
+  rawOrders.forEach(o => {
+    if (o.status === 'UWU_STAFF') {
+      try { staff = JSON.parse(o.items || '[]'); foundStaff = true; } catch(e){}
+      return;
+    }
+
+    let itemsArr = [];
+    try { itemsArr = JSON.parse(o.items || '[]'); } catch(e){}
+    
+    let itemsText = itemsArr.map(it => `${it.name} ×${it.qty}`).join(', ');
+    
+    let tableObj = tables.find(t => String(t.dbId) === String(o.table_id));
+    let tableName = tableObj ? tableObj.id : (o.table_id ? 'โต๊ะ '+o.table_id : 'กลับบ้าน');
+
+    let mappedOrder = {
+      dbId: o.id,
+      id: "#" + String(o.id).padStart(3, "0"),
+      tableId: o.table_id,
+      table: tableName,
+      items: itemsText,
+      total: o.total,
+      status: o.status === 'รออาหาร' ? 'กำลังทำ' : o.status,
+      date: o.created_at ? new Date(o.created_at).toISOString().slice(0,10) : todayISO()
+    };
+
+    if (mappedOrder.status === 'เสร็จแล้ว' || mappedOrder.status === 'จบงาน') {
+      mappedOrder.status = 'เสร็จแล้ว';
+      completedOrders.unshift(mappedOrder);
+    } else {
+      orders.unshift(mappedOrder);
+    }
+  });
+
+  if (!foundStaff && staff.length === 0) {
+    staff = [
+      { name: "Mimi", role: "ผู้จัดการ", status: "กำลังทำงาน", attendance: "เข้าเวร", attendanceTime: "-" },
+      { name: "Mochi", role: "พนักงานเสิร์ฟ", status: "กำลังทำงาน", attendance: "เข้าเวร", attendanceTime: "-" }
+    ];
+  }
+
+  renderOrders();
+  renderMenus();
+  renderTables();
+  renderStaff();
+  renderManagerData();
+  updateDash();
+}
+
+window.onload = refreshAll;
+
+// ==========================================
+// UI & Interaction
+// ==========================================
+function todayISO(){return new Date().toISOString().slice(0,10)}
+function formatDate(date){ const d=new Date(date+"T00:00:00"); return d.toLocaleDateString("th-TH",{day:"2-digit",month:"2-digit",year:"numeric"}); }
+
+const titles={dashboard:"Dashboard",orders:"จัดการออเดอร์",menus:"จัดการเมนู",tables:"จัดการโต๊ะ",staff:"จัดการพนักงาน",manager:"ผู้จัดการ"};
+function showPage(id,btn){document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".top-menu button").forEach(b=>b.classList.remove("active"));btn.classList.add("active");document.getElementById("pageTitle").textContent=titles[id];}
+function statusClass(s){return s==="เสร็จแล้ว"?"green":s==="กำลังทำ"?"yellow":s==="มีลูกค้า"?"yellow":s==="ว่าง"?"green":s==="พัก"?"gray":""}
+
+function renderOrders(){
+  let h=orders.map((o,i)=>`<tr><td>${o.id}</td><td>${o.table}</td><td>${o.items}</td><td>฿${o.total}</td><td>
+  <select class="status-select" onchange="changeStatus(${i}, this.value)">
+  <option value="กำลังทำ" ${o.status==="กำลังทำ"?"selected":""}>กำลังทำ</option>
+  <option value="พร้อมเสิร์ฟ" ${o.status==="พร้อมเสิร์ฟ"?"selected":""}>พร้อมเสิร์ฟ</option>
+  <option value="เสร็จแล้ว" ${o.status==="เสร็จแล้ว"?"selected":""}>เสร็จแล้ว</option>
+  <option value="ยกเลิก" ${o.status==="ยกเลิก"?"selected":""}>ยกเลิก</option>
+  </select></td>
+  <td><button class="btn danger" style="padding: 6px 12px; font-size: 12px;" onclick="deleteOrder(${o.dbId})">ลบ</button></td>
+  </tr>`).join("");
+  document.getElementById("ordersTable").innerHTML=h;
+  document.getElementById("dashOrders").innerHTML=orders.slice(0,5).map(o=>`<tr><td>${formatDate(o.date)}</td><td>${o.id}</td><td>${o.table}</td><td>${o.items}</td><td>฿${o.total}</td><td><span class="status ${statusClass(o.status)}">${o.status}</span></td></tr>`).join("");
+}
+
+async function changeStatus(i, value){
+  const o = orders[i];
+  if(value === "เสร็จแล้ว"){
+    await dbUpdate('uwu_orders', o.dbId, { status: "จบงาน" });
+  } else if (value === "ยกเลิก") {
+    if(confirm("ต้องการยกเลิกและลบออเดอร์นี้ใช่ไหม?")) {
+      await dbDelete('uwu_orders', o.dbId);
+    } else {
+      renderOrders();
+      return;
+    }
+  } else {
+    await dbUpdate('uwu_orders', o.dbId, { status: value });
+  }
+}
+
+async function deleteOrder(dbId){
+  if(confirm("ต้องการลบออเดอร์นี้ใช่ไหม 🐱?")) {
+    await dbDelete('uwu_orders', dbId);
+  }
+}
+
+// ออเดอร์
+let currentOrderItems=[];
+let currentOrderQty=1;
+function populateOrderMenu(){
+  document.getElementById("orderMenu").innerHTML=menus.map((m,i)=>`<option value="${i}">${m.icon} ${m.name} · ฿${m.price}</option>`).join("");
+}
+function renderSelectedOrderItems(){
+  if(!currentOrderItems.length){
+    document.getElementById("selectedOrderItems").innerHTML='<div class="empty-order">ยังไม่มีเมนูที่เลือก เหมียว~</div>';
+  }else{
+    document.getElementById("selectedOrderItems").innerHTML=currentOrderItems.map((item,i)=>`<div class="selected-order-item"><div class="item-info"><b>${item.icon} ${item.name}</b><br><small>฿${item.price} × ${item.qty}</small></div><strong>฿${item.price*item.qty}</strong><button class="remove-item" onclick="removeOrderItem(${i})">✕</button></div>`).join("");
+  }
+  const total=currentOrderItems.reduce((s,item)=>s+item.price*item.qty,0);
+  document.getElementById("orderTotal").textContent="฿"+total.toLocaleString("th-TH");
+}
+function newOrder(){
+  currentOrderItems=[]; currentOrderQty=1; document.getElementById("orderQty").textContent="1";
+  
+  const tableSelect = document.getElementById("orderTable");
+  if(!tables.length) { alert("ผู้จัดการยังไม่ได้เพิ่มโต๊ะเลยนะเหมียว 🐱"); return; }
+  tableSelect.innerHTML = tables.map(t => `<option value="${t.dbId}">🪑 ${t.id} ${t.status==="มีลูกค้า"?"(มีลูกค้า)":""}</option>`).join('');
+  
+  populateOrderMenu(); renderSelectedOrderItems(); document.getElementById("orderModal").classList.add("show");
+}
+function closeOrderModal(){document.getElementById("orderModal").classList.remove("show")}
+function changeOrderQty(delta){currentOrderQty=Math.max(1,currentOrderQty+delta);document.getElementById("orderQty").textContent=currentOrderQty}
+function addOrderItem(){
+  if(!menus.length)return alert("ยังไม่มีเมนูในร้านเหมียว 🐱");
+  const m=menus[Number(document.getElementById("orderMenu").value)];
+  const found=currentOrderItems.find(x=>x.name===m.name);
+  if(found) found.qty+=currentOrderQty;
+  else currentOrderItems.push({...m,qty:currentOrderQty});
+  currentOrderQty=1; document.getElementById("orderQty").textContent="1";
+  renderSelectedOrderItems();
+}
+function removeOrderItem(i){currentOrderItems.splice(i,1);renderSelectedOrderItems()}
+
+async function confirmNewOrder(){
+  const tId = document.getElementById("orderTable").value;
+  if(!tId)return;
+  if(!currentOrderItems.length){alert("เลือกเมนูก่อนนะเหมียว 🐱");return;}
+  
+  const total = currentOrderItems.reduce((s,item)=>s+item.price*item.qty,0);
+  
+  const itemsFormatForDb = currentOrderItems.map(it => ({
+    menu_id: it.dbId, name: it.name, price: it.price, qty: it.qty
+  }));
+
+  const row = {
+    table_id: Number(tId),
+    items: JSON.stringify(itemsFormatForDb),
+    total: total,
+    status: 'กำลังทำ'
+  };
+
+  await dbInsert('uwu_orders', row);
+  closeOrderModal();
+}
+
+// เมนู
+function renderMenus(){
+  document.getElementById("menuGrid").innerHTML=menus.map((m,i)=>`<div class="menu-item"><div class="menu-img">${m.image?`<img src="${m.image}" alt="${m.name}" onerror="this.style.display='none';this.parentElement.innerHTML='${m.icon}'">`:m.icon}</div><b>${m.name}</b><p><span class="price">฿${m.price}</span> · ${m.cat}</p><div class="actions"><button class="btn secondary" onclick="editMenu(${i})">แก้ไข</button><button class="btn danger" onclick="deleteMenu(${m.dbId})">ลบ</button></div></div>`).join("");
+}
+function previewMenuImage(){
+  const url=document.getElementById("menuImage").value.trim();
+  document.getElementById("menuImagePreview").innerHTML=url?`<img src="${url}" alt="ตัวอย่างรูป" onerror="this.style.display='none';this.parentElement.innerHTML='<span>⚠️</span><small>URL รูปนี้ใช้ไม่ได้</small>'">`:'<span>🐱</span><small>ใส่ URL รูปเพื่อดูตัวอย่าง</small>';
+}
+let editingMenuDbId = -1;
+function resetMenuPreview(){document.getElementById("menuImagePreview").innerHTML='<span>🐱</span><small>ใส่ URL รูปเพื่อดูตัวอย่าง</small>'}
+function openMenuModal(){
+  editingMenuDbId = -1;
+  document.getElementById("menuModalTitle").textContent="เพิ่มเมนู";
+  document.getElementById("menuName").value="";
+  document.getElementById("menuPrice").value="";
+  document.getElementById("menuCat").value="ขนมหวาน";
+  document.getElementById("menuImage").value="";
+  resetMenuPreview();
+  document.getElementById("menuModal").classList.add("show");
+  setTimeout(()=>document.getElementById("menuName").focus(),100);
+}
+function closeMenuModal(){document.getElementById("menuModal").classList.remove("show"); editingMenuDbId=-1;}
+
+function editMenu(i){
+  const m=menus[i];
+  editingMenuDbId = m.dbId;
+  document.getElementById("menuModalTitle").textContent="แก้ไขเมนู";
+  document.getElementById("menuName").value=m.name;
+  document.getElementById("menuPrice").value=m.price;
+  document.getElementById("menuCat").value=m.cat;
+  document.getElementById("menuImage").value=m.image||"";
+  previewMenuImage();
+  document.getElementById("menuModal").classList.add("show");
+  setTimeout(()=>document.getElementById("menuName").focus(),100);
+}
+
+async function saveMenu(){
+  let n=document.getElementById("menuName").value.trim(), 
+      p=Number(document.getElementById("menuPrice").value), 
+      c=document.getElementById("menuCat").value, 
+      img=document.getElementById("menuImage").value.trim();
+      
+  if(!n||!p)return alert("กรอกชื่อเมนูและราคาให้ครบ 🐱");
+  
+  let extraDesc = JSON.stringify({ cat: c, icon: c==="เครื่องดื่ม"?"🧋":"🍰", image: img });
+  
+  if (editingMenuDbId !== -1) {
+    await dbUpdate('uwu_menus', editingMenuDbId, { name: n, price: p, description: extraDesc });
+  } else {
+    await dbInsert('uwu_menus', { name: n, price: p, description: extraDesc });
+  }
+  closeMenuModal();
+}
+
+async function deleteMenu(dbId){
+  if(confirm("ลบเมนูนี้ใช่ไหม?")){
+    await dbDelete('uwu_menus', dbId);
+  }
+}
+
+// โต๊ะ
+function renderTables(){
+  document.getElementById("tableGrid").innerHTML=tables.map((t)=>`<div class="card"><div style="font-size:40px">🪑</div><h2>${t.id}</h2><span class="status ${statusClass(t.status)}">${t.status}</span><div class="actions" style="margin-top:15px"><button class="btn danger" onclick="deleteTable(${t.dbId})" ${t.status==="มีลูกค้า"?"disabled":""}>ลบ</button></div></div>`).join("");
+  updateDash();
+}
+async function addTable(){
+  let newName = "T" + String(tables.length+1).padStart(2,"0");
+  await dbInsert('uwu_tables', { name: newName });
+}
+async function deleteTable(dbId){
+  if(confirm("ต้องการลบโต๊ะนี้ทิ้งใช่ไหม?")){
+    await dbDelete('uwu_tables', dbId);
+  }
+}
+
+// พนักงาน
+function renderStaff(){
+  const e=document.getElementById("staffTable");
+  e.innerHTML=staff.map((s,i)=>`<tr><td>${s.name}</td><td>${s.role}</td><td><select class="status-select" onchange="changeStaffStatus(${i},this.value)"><option value="กำลังทำงาน" ${s.status==="กำลังทำงาน"?"selected":""}>🟢 กำลังทำงาน</option><option value="พัก" ${s.status==="พัก"?"selected":""}>🟡 พัก</option><option value="ลา" ${s.status==="ลา"?"selected":""}>🔴 ลา</option></select></td><td><select class="status-select" onchange="changeAttendance(${i},this.value)"><option value="ยังไม่เข้าเวร" ${(!s.attendance||s.attendance==="ยังไม่เข้าเวร")?"selected":""}>⚪ ยังไม่เข้าเวร</option><option value="เข้าเวร" ${s.attendance==="เข้าเวร"?"selected":""}>🟢 เข้าเวร</option><option value="ออกเวร" ${s.attendance==="ออกเวร"?"selected":""}>🔵 ออกเวร</option><option value="ลา" ${s.attendance==="ลา"?"selected":""}>🔴 ลา</option></select><div class="shift-time">${s.attendanceTime||"-"}</div></td><td class="staff-row-actions"><button class="btn edit-staff-btn" onclick="openStaffModal(${i})">แก้ไข</button><button class="btn danger" onclick="removeStaff(${i})">ลบ</button></td></tr>`).join("");
+}
+
+async function syncStaffToDb() {
+  const staffLogs = await dbGet('uwu_orders');
+  const staffRow = staffLogs.find(o => o.status === 'UWU_STAFF');
+  
+  if (staffRow) {
+    await dbUpdate('uwu_orders', staffRow.id, { items: JSON.stringify(staff) });
+  } else {
+    await dbInsert('uwu_orders', { table_id: null, items: JSON.stringify(staff), total: 0, status: 'UWU_STAFF' });
+  }
+}
+
+function changeStaffStatus(i,status){staff[i].status=status; renderStaff(); syncStaffToDb();}
+function changeAttendance(i,status){
+  staff[i].attendance=status; 
+  staff[i].attendanceTime = new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"}); 
+  renderStaff(); syncStaffToDb();
+}
+function removeStaff(i){if(confirm("ลบพนักงานคนนี้ใช่ไหม?")){staff.splice(i,1); renderStaff(); syncStaffToDb();}}
+
+let editingStaffIndex=-1;
+function openStaffModal(index=-1){
+  editingStaffIndex=index;
+  document.getElementById("staffModalTitle").textContent=index<0?"เพิ่มพนักงานใหม่":"แก้ไขข้อมูลพนักงาน";
+  const s=index<0?{name:"",role:"พนักงานเสิร์ฟ",status:"กำลังทำงาน",attendance:"ยังไม่เข้าเวร"}:staff[index];
+  document.getElementById("staffName").value=s.name;
+  document.getElementById("staffRole").value=s.role;
+  document.getElementById("staffStatus").value=s.status;
+  document.getElementById("staffAttendance").value=s.attendance||"ยังไม่เข้าเวร";
+  document.getElementById("staffModal").classList.add("show");
+  setTimeout(()=>document.getElementById("staffName").focus(),80);
+}
+function closeStaffModal(){document.getElementById("staffModal").classList.remove("show");editingStaffIndex=-1}
+
+async function saveStaff(){
+  const name=document.getElementById("staffName").value.trim();
+  if(!name){alert("กรุณาใส่ชื่อพนักงานนะ 🐱");return}
+  const data={name,role:document.getElementById("staffRole").value,status:document.getElementById("staffStatus").value,attendance:document.getElementById("staffAttendance").value,attendanceTime:(editingStaffIndex>=0?staff[editingStaffIndex].attendanceTime:"-")};
+  if(editingStaffIndex<0) staff.push(data); else staff[editingStaffIndex]=data;
+  
+  await syncStaffToDb();
+  renderStaff(); closeStaffModal();
+}
+
+// โหมดผู้จัดการ
+const MANAGER_PASSWORD="1208";
+let managerLoginButton=null;
+let managerUnlocked=false;
+
+function openManagerLogin(btn){
+  managerLoginButton=btn;
+  if(managerUnlocked){showPage("manager",btn);return}
+  document.getElementById("managerPassword").value="";
+  document.getElementById("managerLoginModal").classList.add("show");
+  setTimeout(()=>document.getElementById("managerPassword").focus(),80);
+}
+function closeManagerLogin(){document.getElementById("managerLoginModal").classList.remove("show")}
+function verifyManagerPassword(){
+  const input=document.getElementById("managerPassword").value;
+  if(input===MANAGER_PASSWORD){
+    managerUnlocked=true;
+    closeManagerLogin();
+    showPage("manager",managerLoginButton);
+  }else{
+    alert("รหัสผู้จัดการไม่ถูกต้องนะเหมียว 🐱");
+    document.getElementById("managerPassword").select();
+  }
+}
+
+function renderManagerData(){
+  const total=completedOrders.reduce((sum,o)=>sum+Number(o.total||0),0);
+  document.getElementById("completedSales").textContent="฿"+total.toLocaleString("th-TH");
+  document.getElementById("completedCount").textContent=completedOrders.length;
+  document.getElementById("pendingCount").textContent=orders.length;
+  
+  document.getElementById("completedOrdersTable").innerHTML=completedOrders.map(o=>`<tr><td>${formatDate(o.date||todayISO())}</td><td>${o.id}</td><td>${o.table}</td><td>${o.items}</td><td>฿${Number(o.total).toLocaleString("th-TH")}</td><td><span class="status green">เสร็จแล้ว</span></td></tr>`).join("");
+}
+
+function updateDash(){
+  const todayStr = todayISO();
+  const todayOrders = completedOrders.filter(o => o.date === todayStr);
+  const todaySales = todayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+  
+  document.getElementById("sales").textContent = "฿" + todaySales.toLocaleString("th-TH");
+  document.getElementById("orderCount").textContent = (todayOrders.length + orders.length);
+  document.getElementById("freeTables").textContent = tables.filter(t => t.status==="ว่าง").length;
+}
+
+</script>
+</body>
+</html>
