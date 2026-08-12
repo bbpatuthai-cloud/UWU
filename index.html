@@ -223,7 +223,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
   </div>
   <div class="scroll-table-wrap">
     <table>
-      <thead><tr><th>ชื่อพนักงาน</th><th>ตำแหน่ง</th><th>สถานะงาน</th><th>การเข้าเวร</th><th>จัดการ</th></tr></thead>
+      <thead><tr><th>ชื่อพนักงาน</th><th>ตำแหน่ง</th><th>สถานะงาน</th><th>จัดการ</th></tr></thead>
       <tbody id="managerStaffManagerTable"></tbody>
     </table>
   </div>
@@ -238,16 +238,6 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
     <table>
       <thead><tr><th>วันที่บันทึก</th><th>ยอดขายรวม</th><th>จำนวนออเดอร์</th><th>เมนูขายดี</th></tr></thead>
       <tbody id="dailySummaryTable"></tbody>
-    </table>
-  </div>
- </div>
-
- <div class="panel">
-  <h2>⏱️ เวลาปฏิบัติงานพนักงาน (Realtime Shifts)</h2>
-  <div class="scroll-table-wrap">
-    <table>
-      <thead><tr><th>พนักงาน</th><th>ตำแหน่ง</th><th>เวลาเริ่มเข้าเวร</th><th>เวลาที่ทำงานไปแล้ว</th></tr></thead>
-      <tbody id="managerStaffShiftTable"></tbody>
     </table>
   </div>
  </div>
@@ -706,24 +696,29 @@ function renderStaffSelectOptions() {
     staff.map(s => `<option value="${s.dbId}">${s.name} (${s.role}) - เวร: ${s.attendance}</option>`).join('');
 }
 
-// หน้าพนักงาน: แสดงเฉพาะรายชื่อและเวลาที่เข้าเวรอยู่
+// หน้าเข้า-ออกเวร: แสดงเฉพาะพนักงานที่กำลังเข้าเวรอยู่เท่านั้น
 function renderStaff(){
   const e=document.getElementById("staffTable");
   if(!e) return;
   
-  e.innerHTML=staff.map((s,i)=>{
-    const isWorking = s.attendance === "เข้าเวร";
+  const activeStaff = staff.filter(s => s.attendance === "เข้าเวร");
+  if (activeStaff.length === 0) {
+    e.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#a17f90; padding:20px;">ไม่มีพนักงานเข้าเวรอยู่ในขณะนี้ เหมียว~ 🐾</td></tr>';
+    return;
+  }
+
+  e.innerHTML=activeStaff.map((s,i)=>{
     return `<tr>
       <td><b>${s.name}</b></td>
       <td>${s.role}</td>
       <td><span class="status ${s.status === 'กำลังทำงาน' ? 'green' : s.status === 'พัก' ? 'yellow' : 'red'}">${s.status}</span></td>
-      <td><span class="status ${isWorking ? 'green' : 'blue'}">${s.attendance}</span></td>
-      <td><span id="staff-timer-${i}" class="live-timer">⏱️ -</span></td>
+      <td><span class="status green">${s.attendance}</span></td>
+      <td><span id="staff-timer-${s.dbId}" class="live-timer">⏱️ -</span></td>
     </tr>`;
   }).join("");
 }
 
-// หน้าผู้จัดการ: จัดการรายชื่อพนักงาน แก้ไข / ลบ
+// หน้าผู้จัดการ: จัดการรายชื่อพนักงาน แก้ไข / ลบ (แสดงเฉพาะสถานะงาน)
 function renderManagerStaffTable() {
   const tbody = document.getElementById("managerStaffManagerTable");
   if (!tbody) return;
@@ -738,7 +733,6 @@ function renderManagerStaffTable() {
         <option value="ลา" ${s.status==="ลา"?"selected":""}>🔴 ลา</option>
       </select>
     </td>
-    <td><span class="status ${s.attendance === 'เข้าเวร' ? 'green' : 'blue'}">${s.attendance}</span></td>
     <td class="staff-row-actions">
       <button class="btn edit-staff-btn" onclick="openStaffModal(${i})">แก้ไข</button>
       <button class="btn danger" onclick="removeStaff(${i})">ลบ</button>
@@ -874,52 +868,22 @@ function renderShiftLogs() {
   }
 }
 
+// คำนวณเวลานับเดินหน้า Realtime รายบุคคลของพนักงานที่กำลังเข้าเวร
 function renderLiveShiftTimes() {
   const now = Date.now();
   
-  // 1. คำนวณเวลาทำงานรายคนในหน้าพนักงาน
-  staff.forEach((s, i) => {
-    const timerEl = document.getElementById(`staff-timer-${i}`);
-    if (timerEl) {
-      if (s.attendance === "เข้าเวร" && s.shiftStartTimestamp) {
+  staff.forEach((s) => {
+    if (s.attendance === "เข้าเวร" && s.shiftStartTimestamp) {
+      const timerEl = document.getElementById(`staff-timer-${s.dbId}`);
+      if (timerEl) {
         const diffSecs = Math.floor((now - Number(s.shiftStartTimestamp)) / 1000);
         const hrs = Math.floor(diffSecs / 3600);
         const mins = Math.floor((diffSecs % 3600) / 60);
         const secs = diffSecs % 60;
         timerEl.textContent = `⏱️ ${hrs > 0 ? hrs + ' ชม. ' : ''}${mins} น. ${secs} ส.`;
-      } else {
-        timerEl.textContent = "⏱️ -";
       }
     }
   });
-
-  // 2. คำนวณเวลารวมซิงค์ Realtime ไปยังหน้าผู้จัดการ
-  const tbody = document.getElementById("managerStaffShiftTable");
-  if (!tbody) return;
-
-  const activeStaff = staff.filter(s => s.attendance === "เข้าเวร");
-  if (activeStaff.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#a17f90; padding:20px;">ไม่มีพนักงานเข้าเวรขณะนี้</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = activeStaff.map(s => {
-    let durationText = "กำลังคำนวณ...";
-    if (s.shiftStartTimestamp) {
-      const diffSecs = Math.floor((now - Number(s.shiftStartTimestamp)) / 1000);
-      const hrs = Math.floor(diffSecs / 3600);
-      const mins = Math.floor((diffSecs % 3600) / 60);
-      const secs = diffSecs % 60;
-      durationText = `${hrs > 0 ? hrs + ' ชม. ' : ''}${mins} น. ${secs} ส.`;
-    }
-
-    return `<tr>
-      <td><b>${s.name}</b></td>
-      <td>${s.role}</td>
-      <td>${s.attendanceTime || '-'}</td>
-      <td><span class="live-timer">⏱️ ${durationText}</span></td>
-    </tr>`;
-  }).join("");
 }
 
 async function saveDailySummary() {
