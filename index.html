@@ -219,14 +219,12 @@ window.SUPABASE_CONFIG = {
 
 let sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.publishableKey);
 
-// ตั้งค่า Supabase Realtime Channel ฟังการเปลี่ยนแปลงตารางโดยตรง (Postgres Changes Realtime)
-const realtimeChannel = sb.channel('uwu-realtime-global')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_tables' }, () => refreshAll())
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_menus' }, () => refreshAll())
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_orders' }, () => refreshAll())
-  .subscribe();
+// ตั้งค่า Supabase Realtime Listeners แบบจับทุกการเปลี่ยนแปลง (INSERT, UPDATE, DELETE)
+sb.channel('public:uwu_tables').on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_tables' }, () => refreshAll()).subscribe();
+sb.channel('public:uwu_menus').on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_menus' }, () => refreshAll()).subscribe();
+sb.channel('public:uwu_orders').on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_orders' }, () => refreshAll()).subscribe();
 
-// Broadcast Backup Sync เพื่อความชัวร์ในการข้ามเบราว์เซอร์
+// Backup Realtime Sync ข้ามแท็บ
 const syncChannel = new BroadcastChannel('uwu_cafe_realtime_sync');
 syncChannel.onmessage = () => refreshAll();
 
