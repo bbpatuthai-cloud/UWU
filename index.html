@@ -207,12 +207,14 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 </div>
 
 <script>
+// 🟢 Config Supabase (แก้ไข Key รูปแบบใหม่ให้เข้ากับ Supabase JS Client v2)
 window.SUPABASE_CONFIG = {
   url: "https://vehsmnstxrdzcrsrsgzr.supabase.co",
-  publishableKey: "sb_publishable_1ddU0deXdUTJCOOz6F52Ug_3xYtUNhP"
+  publishableKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlaHNtbnN0eHJkemNyc3JzZ3pyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAxNTAwMDAwMH0.placeholder"
 };
 
 let sb = null;
+let realtimeChannel = null;
 let tables = [], menus = [], orders = [], staff = [], completedOrders = [];
 
 function setOnlineStatus(online) {
@@ -227,20 +229,37 @@ function setOnlineStatus(online) {
   }
 }
 
-// 🟢 ระบบ Realtime ที่ปรับปรุงใหม่
+// 🟢 ระบบ Realtime เชื่อมต่อแบบ Hybrid (Broadcast + Postgres Changes)
 if (window.SUPABASE_CONFIG.url && window.supabase) {
-  sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.publishableKey);
+  try {
+    sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.publishableKey);
 
-  sb.channel('uwu-realtime-changes')
+    realtimeChannel = sb.channel('uwu-room', {
+      config: { broadcast: { self: true } }
+    })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_tables' }, () => refreshAll())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_menus' }, () => refreshAll())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_orders' }, () => refreshAll())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'uwu_staff' }, () => refreshAll())
+    .on('broadcast', { event: 'sync_data' }, () => refreshAll())
     .subscribe((status) => {
       setOnlineStatus(status === 'SUBSCRIBED');
     });
+  } catch(e) {
+    setOnlineStatus(false);
+  }
 } else {
   setOnlineStatus(false);
+}
+
+function notifySync() {
+  if (realtimeChannel) {
+    realtimeChannel.send({
+      type: 'broadcast',
+      event: 'sync_data',
+      payload: { timestamp: Date.now() }
+    });
+  }
 }
 
 // Data Handlers
@@ -252,7 +271,6 @@ async function dbGet(table) {
     setOnlineStatus(true);
     return data || [];
   } catch(e) {
-    setOnlineStatus(false);
     return JSON.parse(localStorage.getItem(table)||'[]');
   }
 }
@@ -261,15 +279,16 @@ async function dbInsert(table, row) {
   if(!sb) { 
     let a = await dbGet(table); row.id = Date.now(); a.push(row); 
     localStorage.setItem(table, JSON.stringify(a)); 
-    await refreshAll(); return row; 
+    await refreshAll(); notifySync(); return row; 
   }
   try {
     let {data, error} = await sb.from(table).insert(row).select().single();
     if(error) throw error;
+    await refreshAll(); notifySync();
     return data;
   } catch(e) {
     let a = await dbGet(table); row.id = Date.now(); a.push(row); localStorage.setItem(table, JSON.stringify(a));
-    await refreshAll();
+    await refreshAll(); notifySync();
     return row;
   }
 }
@@ -278,15 +297,16 @@ async function dbUpdate(table, id, row) {
   if(!sb) { 
     let a = await dbGet(table); a = a.map(x => x.id === id ? {...x,...row} : x); 
     localStorage.setItem(table, JSON.stringify(a)); 
-    await refreshAll(); return true; 
+    await refreshAll(); notifySync(); return true; 
   }
   try {
     let {error} = await sb.from(table).update(row).eq('id', id);
     if(error) throw error;
+    await refreshAll(); notifySync();
     return true;
   } catch(e) {
     let a = await dbGet(table); a = a.map(x => x.id === id ? {...x,...row} : x); localStorage.setItem(table, JSON.stringify(a));
-    await refreshAll();
+    await refreshAll(); notifySync();
     return true;
   }
 }
@@ -295,15 +315,16 @@ async function dbDelete(table, id) {
   if(!sb) { 
     let a = await dbGet(table); a = a.filter(x => x.id !== id); 
     localStorage.setItem(table, JSON.stringify(a)); 
-    await refreshAll(); return true; 
+    await refreshAll(); notifySync(); return true; 
   }
   try {
     let {error} = await sb.from(table).delete().eq('id', id);
     if(error) throw error;
+    await refreshAll(); notifySync();
     return true;
   } catch(e) {
     let a = await dbGet(table); a = a.filter(x => x.id !== id); localStorage.setItem(table, JSON.stringify(a));
-    await refreshAll();
+    await refreshAll(); notifySync();
     return true;
   }
 }
@@ -514,16 +535,16 @@ function renderStaff(){
 
 async function changeStaffStatus(i, status){
   const s = staff[i];
-  await dbUpdate('uwu_staff', s.dbId, { status: status });
+  if(s.dbId) await dbUpdate('uwu_staff', s.dbId, { status: status });
 }
 async function changeAttendance(i, status){ 
   const s = staff[i];
   const timeStr = new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"});
-  await dbUpdate('uwu_staff', s.dbId, { attendance: status, attendance_time: timeStr });
+  if(s.dbId) await dbUpdate('uwu_staff', s.dbId, { attendance: status, attendance_time: timeStr });
 }
 async function removeStaff(i){
   if(confirm("ลบพนักงานคนนี้ใช่ไหม?")){
-    await dbDelete('uwu_staff', staff[i].dbId);
+    if(staff[i].dbId) await dbDelete('uwu_staff', staff[i].dbId);
   }
 }
 
@@ -547,7 +568,7 @@ async function saveStaff(){
     await dbInsert('uwu_staff', { name, role, status, attendance, attendance_time: '-' });
   } else {
     const s = staff[editingStaffIndex];
-    await dbUpdate('uwu_staff', s.dbId, { name, role, status, attendance });
+    if(s.dbId) await dbUpdate('uwu_staff', s.dbId, { name, role, status, attendance });
   }
   closeStaffModal();
 }
