@@ -1305,11 +1305,19 @@ function renderLiveShiftTimes() {
   });
 }
 
-// บันทึกสรุปยอดประจำวัน พร้อมซิงค์ไป Discord
+// 📝 แก้ไข: ฟังก์ชันบันทึกสรุปยอดประจำวัน เพิ่มการสร้างและจัดเก็บ Snapshot ไว้ใน Database
 async function saveDailySummary() {
   const todayStr = getLocalISO();
   const todayOrders = completedOrders.filter(o => o.date === todayStr && o.status !== 'ยกเลิก');
   const todaySales = todayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+
+  // 📝 สร้าง Snapshot ของออเดอร์เก็บไว้ (ป้องกันข้อมูลหายเมื่อลบออเดอร์ทิ้งทีหลัง)
+  const ordersSnapshot = JSON.stringify(todayOrders.map(o => ({
+    id: o.id,
+    table: o.table,
+    items: o.items,
+    total: o.total
+  })));
 
   if(confirm(`ยืนยันการบันทึกยอดประจำวันที่ ${formatDate(todayStr)}?\nยอดขาย: ฿${todaySales.toLocaleString()}\nจำนวนออเดอร์: ${todayOrders.length}`)) {
     await dbInsert('uwu_daily_summaries', {
@@ -1317,7 +1325,8 @@ async function saveDailySummary() {
       total_sales: todaySales,
       order_count: todayOrders.length,
       top_item: topSellingItemStr,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      orders_snapshot: ordersSnapshot // เพิ่มข้อมูล Snapshot ฝังลงไป
     });
 
     // ส่งการแจ้งเตือนปิดยอดขายไปที่ Discord
@@ -1336,6 +1345,7 @@ async function saveDailySummary() {
   }
 }
 
+// 📝 แก้ไข: ส่งค่า ID สำหรับดึงข้อมูลเวลาเปิดดูรายละเอียด
 function renderDailySummaries() {
   const tbody = document.getElementById("dailySummaryTable");
   if(!tbody) return;
@@ -1354,7 +1364,8 @@ function renderDailySummaries() {
     <td>${d.order_count||0} ออเดอร์</td>
     <td>${d.top_item||"-"}</td>
     <td>
-      <button class="btn secondary" style="padding:4px 8px; font-size:12px" onclick="viewDayItemsDetail('${d.date}')">🔍 ดูรายการ</button>
+      <!-- เปลี่ยนการเรียกฟังก์ชัน viewDayItemsDetail ให้ส่งค่า d.id แทน d.date -->
+      <button class="btn secondary" style="padding:4px 8px; font-size:12px" onclick="viewDayItemsDetail(${d.id})">🔍 ดูรายการ</button>
       <button class="btn danger" style="padding:4px 8px; font-size:12px; margin-left:4px;" onclick="deleteDailySummary(${d.id})">🗑️ ลบ</button>
     </td>
   </tr>`).join("");
@@ -1367,26 +1378,46 @@ async function deleteDailySummary(id) {
   }
 }
 
-function viewDayItemsDetail(dateStr) {
-  const dayOrders = completedOrders.filter(o => o.date === dateStr && o.status !== 'ยกเลิก');
-  const totalSales = dayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+// 📝 แก้ไข: ฟังก์ชันดูรายละเอียด ดึงข้อมูลจาก Snapshot เป็นหลัก
+function viewDayItemsDetail(summaryId) {
+  // ค้นหาข้อมูลสรุปยอดจาก ID
+  const summary = dailySummaries.find(s => s.id === summaryId);
+  if (!summary) return;
+
+  const dateStr = summary.date;
+  let dayOrders = [];
+
+  // ดึงข้อมูลรายการอาหารที่บันทึกฝังไว้ตอนปิดยอด
+  if (summary.orders_snapshot) {
+    try {
+      dayOrders = JSON.parse(summary.orders_snapshot);
+    } catch(e) {
+      dayOrders = [];
+    }
+  } else {
+    // Fallback: หากเป็นการบันทึกยอดแบบเก่า(ที่ยังไม่ได้เก็บ Snapshot) ก็ยังทำงานดึงจากออเดอร์สดได้อยู่
+    dayOrders = completedOrders.filter(o => o.date === dateStr && o.status !== 'ยกเลิก');
+  }
+
+  const totalSales = summary.total_sales || 0;
+  const orderCount = summary.order_count || dayOrders.length;
 
   document.getElementById('dayDetailModalTitle').textContent = `สรุปยอดขายวันที่ ${formatDate(dateStr)}`;
 
   let html = `
     <div style="background:#fff0f6; padding:12px; border-radius:12px; margin-bottom:15px; color:#7e5c6d; border:1px solid #f8d5e5; text-align:center;">
-      <div>ยอดขายรวม: <b style="color:#d65f91; font-size:22px;">฿${totalSales.toLocaleString('th-TH')}</b></div>
-      <div style="margin-top: 5px;">จำนวน: <b>${dayOrders.length} ออเดอร์</b></div>
+      <div>ยอดขายรวม: <b style="color:#d65f91; font-size:22px;">฿${Number(totalSales).toLocaleString('th-TH')}</b></div>
+      <div style="margin-top: 5px;">จำนวน: <b>${orderCount} ออเดอร์</b></div>
     </div>
   `;
 
   if(!dayOrders.length){
-    html += '<div class="empty-order" style="text-align:center; padding: 20px;">ไม่มีออเดอร์ในระบบสำหรับวันนี้ เหมียว~</div>';
+    html += '<div class="empty-order" style="text-align:center; padding: 20px;">ไม่มีออเดอร์ในระบบสำหรับวันนี้ เหมียว~ (อาจถูกลบไปก่อนที่จะมีระบบจัดเก็บ)</div>';
   } else {
     html += `<div class="selected-order-items" style="max-height:300px; overflow-y:auto;">`;
     dayOrders.forEach(o => {
       html += `<div class="selected-order-item" style="display:flex; justify-content:space-between; padding: 10px; border-bottom: 1px solid #f7e7ee;">
-        <div><b>ออเดอร์ ${o.id} (${o.table})</b><br><small style="color:#a07f8e;">${o.items}</small></div>
+        <div><b>ออเดอร์ ${o.id} (${o.table || '-'})</b><br><small style="color:#a07f8e;">${o.items}</small></div>
         <strong style="color:#d65f91;">฿${Number(o.total||0).toLocaleString('th-TH')}</strong>
       </div>`;
     });
