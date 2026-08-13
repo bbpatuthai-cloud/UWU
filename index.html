@@ -570,6 +570,9 @@ async function refreshRealtimeData() {
   try { await refreshAll(); } finally { refreshInProgress = false; }
 }
 
+// ==========================================
+// 🔥 อัปเดต: แก้ไขการผูก Event Realtime
+// ==========================================
 function initRealtime() {
   if (!sb) return;
   if (realtimeChannel) {
@@ -578,8 +581,9 @@ function initRealtime() {
 
   realtimeChannel = sb.channel('uwu-cafe-single-channel');
 
+  // เพิ่มการจับ Event ให้ครบทุกตาราง โดยใช้ realtimeChannel = realtimeChannel.on(...) ตามโครงสร้าง Supabase v2
   ['uwu_tables', 'uwu_menus', 'uwu_orders', 'uwu_staff', 'uwu_daily_summaries'].forEach(tableName => {
-    realtimeChannel.on('postgres_changes', { event: '*', schema: 'public', table: tableName }, () => debouncedRefresh());
+    realtimeChannel = realtimeChannel.on('postgres_changes', { event: '*', schema: 'public', table: tableName }, () => debouncedRefresh());
   });
 
   realtimeChannel.subscribe((status) => {
