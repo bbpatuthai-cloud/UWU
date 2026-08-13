@@ -400,7 +400,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
   <div class="card"><small>ออเดอร์รอทำ</small><div class="value" id="pendingCount">0</div></div>
  </div>
  <div class="panel"><h2>📊 ประวัติออเดอร์ที่จบงานแล้ว</h2>
-  <table><thead><tr><th>วันที่</th><th>เลขที่ออเดอร์</th><th>โต๊ะ</th><th>รายการ</th><th>ยอดรวม</th><th>สถานะ</th></tr></thead>
+  <table><thead><tr><th>วันที่</th><th>เลขที่ออเดอร์</th><th>โต๊ะ</th><th>รายการ</th><th>ยอดรวม</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
   <tbody id="completedOrdersTable"></tbody></table>
  </div>
 </section>
@@ -720,8 +720,11 @@ async function refreshAll() {
   rawOrders.forEach(o => {
     if (o.status === 'CLOCK_LOG' || o.status === 'DAILY_SETTLEMENT') return;
 
-    let itemsArr = parseOrderItems(o.items);
-    itemsArr.forEach(it => { itemCounts[it.name] = (itemCounts[it.name] || 0) + (it.qty || 1); });
+    if (o.status !== 'ยกเลิก') {
+      let itemsArr = parseOrderItems(o.items);
+      itemsArr.forEach(it => { itemCounts[it.name] = (itemCounts[it.name] || 0) + (it.qty || 1); });
+    }
+    
     let itemsText = formatOrderItemsText(o.items);
     let tableObj = tables.find(t => String(t.dbId) === String(o.table_id));
     let tableName = tableObj ? tableObj.id : (o.table_id ? 'โต๊ะ '+o.table_id : 'กลับบ้าน');
@@ -733,8 +736,9 @@ async function refreshAll() {
       timeStr: o.created_at ? new Date(o.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : ''
     };
 
-    if (mappedOrder.status === 'เสร็จแล้ว' || mappedOrder.status === 'จบงาน') {
-      mappedOrder.status = 'เสร็จแล้ว'; completedOrders.unshift(mappedOrder);
+    if (mappedOrder.status === 'เสร็จแล้ว' || mappedOrder.status === 'จบงาน' || mappedOrder.status === 'ยกเลิก') {
+      if (mappedOrder.status === 'จบงาน') mappedOrder.status = 'เสร็จแล้ว';
+      completedOrders.unshift(mappedOrder);
     }
   });
   
@@ -830,7 +834,7 @@ function createOrderCardHtml(o, isDashboard = false) {
 }
 
 function renderOrders(){
-  const normalOrders = orders.filter(o => o.status !== 'CLOCK_LOG' && o.status !== 'DAILY_SETTLEMENT');
+  const normalOrders = orders.filter(o => o.status !== 'CLOCK_LOG' && o.status !== 'DAILY_SETTLEMENT' && o.status !== 'เสร็จแล้ว' && o.status !== 'ยกเลิก' && o.status !== 'จบงาน');
   
   // 1. Render หน้าจัดการออเดอร์ (All Active Orders)
   const ordersTableEl = document.getElementById("ordersTable");
@@ -851,10 +855,20 @@ function renderOrders(){
 
 async function changeStatus(id, value){
   if (value === "ยกเลิก") {
-    if(confirm("ต้องการยกเลิกและลบออเดอร์นี้ใช่ไหม?")) await dbDelete('uwu_orders', id);
-    else renderOrders();
+    if(confirm("ต้องการยกเลิกและย้ายออเดอร์นี้ไปที่ประวัติใช่ไหม?")) {
+        await dbUpdate('uwu_orders', id, { status: 'ยกเลิก' });
+    }
+    else {
+        renderOrders();
+    }
   } else {
     await dbUpdate('uwu_orders', id, { status: value });
+  }
+}
+
+async function deleteCompletedOrder(id) {
+  if (confirm("ต้องการลบประวัติออเดอร์นี้อย่างถาวรใช่ไหม?")) {
+    await dbDelete('uwu_orders', id);
   }
 }
 
@@ -1083,14 +1097,18 @@ function verifyManagerPassword(){
 }
 
 function renderManagerData(){
-  const total=completedOrders.reduce((sum,o)=>sum+Number(o.total||0),0);
+  const validCompleted = completedOrders.filter(o => o.status !== 'ยกเลิก');
+  const total=validCompleted.reduce((sum,o)=>sum+Number(o.total||0),0);
+  
   document.getElementById("completedSales").textContent="฿"+total.toLocaleString("th-TH");
-  document.getElementById("completedCount").textContent=completedOrders.length;
-  document.getElementById("pendingCount").textContent=orders.length;
+  document.getElementById("completedCount").textContent=validCompleted.length;
+  document.getElementById("pendingCount").textContent=orders.filter(o => o.status !== 'CLOCK_LOG' && o.status !== 'DAILY_SETTLEMENT' && o.status !== 'เสร็จแล้ว' && o.status !== 'ยกเลิก' && o.status !== 'จบงาน').length;
+
   document.getElementById("completedOrdersTable").innerHTML=completedOrders.map(o=>`<tr>
     <td>${formatDate(o.date)}</td><td>${o.id}</td><td>${o.table}</td><td>${o.items}</td>
     <td>฿${Number(o.total).toLocaleString("th-TH")}</td>
-    <td><span class="status green">เสร็จแล้ว</span></td>
+    <td><span class="status ${o.status==='ยกเลิก'?'red':'green'}">${o.status}</span></td>
+    <td><button class="btn danger" style="padding:4px 8px; font-size:12px;" onclick="deleteCompletedOrder(${o.dbId})">ลบถาวร</button></td>
   </tr>`).join("");
 }
 
@@ -1286,7 +1304,7 @@ function renderLiveShiftTimes() {
 // บันทึกสรุปยอดประจำวัน พร้อมซิงค์ไป Discord
 async function saveDailySummary() {
   const todayStr = getLocalISO();
-  const todayOrders = completedOrders.filter(o => o.date === todayStr);
+  const todayOrders = completedOrders.filter(o => o.date === todayStr && o.status !== 'ยกเลิก');
   const todaySales = todayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
 
   if(confirm(`ยืนยันการบันทึกยอดประจำวันที่ ${formatDate(todayStr)}?\nยอดขาย: ฿${todaySales.toLocaleString()}\nจำนวนออเดอร์: ${todayOrders.length}`)) {
@@ -1346,7 +1364,7 @@ async function deleteDailySummary(id) {
 }
 
 function viewDayItemsDetail(dateStr) {
-  const dayOrders = completedOrders.filter(o => o.date === dateStr);
+  const dayOrders = completedOrders.filter(o => o.date === dateStr && o.status !== 'ยกเลิก');
   const totalSales = dayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
 
   document.getElementById('dayDetailModalTitle').textContent = `สรุปยอดขายวันที่ ${formatDate(dateStr)}`;
@@ -1381,10 +1399,12 @@ function closeDayDetailModal() {
 
 function updateDash(){
   const todayStr = getLocalISO();
-  const todayOrders = completedOrders.filter(o => o.date === todayStr);
+  const todayOrders = completedOrders.filter(o => o.date === todayStr && o.status !== 'ยกเลิก');
   const todaySales = todayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+  const pendingCount = orders.filter(o => o.status !== 'CLOCK_LOG' && o.status !== 'DAILY_SETTLEMENT' && o.status !== 'เสร็จแล้ว' && o.status !== 'ยกเลิก' && o.status !== 'จบงาน').length;
+
   document.getElementById("sales").textContent = "฿" + todaySales.toLocaleString("th-TH");
-  document.getElementById("orderCount").textContent = (todayOrders.length + orders.length);
+  document.getElementById("orderCount").textContent = (todayOrders.length + pendingCount);
   document.getElementById("freeTables").textContent = tables.filter(t => t.status==="ว่าง").length;
   document.getElementById("topSellingItem").textContent = topSellingItemStr;
 }
