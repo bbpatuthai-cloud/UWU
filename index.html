@@ -373,13 +373,13 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
 
  <div class="panel">
   <div style="display:flex; justify-content:space-between; align-items:center;">
-    <h2>📅 สรุปยอดขายรายเดือน (Monthly Summary)</h2>
+    <h2>📅 สรุปยอดขายรายวัน (Daily Summary)</h2>
     <button class="btn" onclick="saveDailySummary()">💾 บันทึกสรุปยอดวันนี้</button>
   </div>
   <div class="scroll-table-wrap">
     <table>
-      <thead><tr><th>เดือน / ปี</th><th>ยอดขายรวมทั้งเดือน</th><th>จำนวนออเดอร์รวม</th><th>การจัดการ</th></tr></thead>
-      <tbody id="monthlySummaryTable"></tbody>
+      <thead><tr><th>วันที่</th><th>ยอดขายรวม</th><th>จำนวนออเดอร์</th><th>เมนูขายดี</th><th>จัดการ</th></tr></thead>
+      <tbody id="dailySummaryTable"></tbody>
     </table>
   </div>
  </div>
@@ -479,28 +479,15 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 10p
   </div>
 </div></div>
 
-<!-- Modal ดูสรุปยอดรายวันย่อยในแต่ละเดือน -->
-<div class="modal" id="dailyDetailModal" onclick="if(event.target===this)closeDailyDetailModal()">
+<!-- Modal ดูรายละเอียดออเดอร์รายวัน -->
+<div class="modal" id="dayDetailModal" onclick="if(event.target===this)closeDayDetailModal()">
 <div class="modal-card-box order-modal-large">
   <div class="modal-cat-icon">📊</div>
-  <div class="modal-title-text"><span id="dailyDetailModalTitle">รายละเอียดสรุปยอดรายวัน</span></div>
-  <div class="modal-sub-text">เหมียว~ สรุปรายวันสำหรับเดือนที่เลือกนะ 💕</div>
-  <div class="scroll-table-wrap" style="max-height:350px;">
-    <table>
-      <thead>
-        <tr>
-          <th>วันที่</th>
-          <th>ยอดขายรวม</th>
-          <th>จำนวนออเดอร์</th>
-          <th>เมนูขายดี</th>
-          <th>จัดการ</th>
-        </tr>
-      </thead>
-      <tbody id="dailyDetailTable"></tbody>
-    </table>
-  </div>
+  <div class="modal-title-text"><span id="dayDetailModalTitle">รายละเอียดออเดอร์</span></div>
+  <div class="modal-sub-text">เหมียว~ รายการอาหารที่ขายได้ในวันนี้ 💕</div>
+  <div id="dayDetailContent" style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;"></div>
   <div class="modal-actions">
-    <button class="btn secondary" style="width:100%" onclick="closeDailyDetailModal()">ปิดหน้าต่าง</button>
+    <button class="btn secondary" style="width:100%" onclick="closeDayDetailModal()">ปิดหน้าต่าง</button>
   </div>
 </div></div>
 
@@ -770,7 +757,7 @@ async function refreshAll() {
   renderManagerData();
   renderAttendanceList();
   renderLiveShiftTimes();
-  renderMonthlySummaries();
+  renderDailySummaries();
   updateDash();
 }
 
@@ -1327,84 +1314,33 @@ async function saveDailySummary() {
   }
 }
 
-function renderMonthlySummaries() {
-  const tbody = document.getElementById("monthlySummaryTable");
+function renderDailySummaries() {
+  const tbody = document.getElementById("dailySummaryTable");
   if(!tbody) return;
 
   if(dailySummaries.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#a17f90; padding:20px;">ยังไม่มีประวัติการบันทึกยอด</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#a17f90; padding:20px;">ยังไม่มีประวัติการบันทึกยอดรายวัน</td></tr>';
     return;
   }
 
-  const monthGroups = {};
-  dailySummaries.forEach(d => {
-    const monthKey = d.date ? d.date.slice(0, 7) : 'ไม่ระบุ';
-    if(!monthGroups[monthKey]) {
-      monthGroups[monthKey] = {
-        monthKey: monthKey,
-        totalSales: 0,
-        totalOrders: 0,
-        days: []
-      };
-    }
-    monthGroups[monthKey].totalSales += Number(d.total_sales || 0);
-    monthGroups[monthKey].totalOrders += Number(d.order_count || 0);
-    monthGroups[monthKey].days.push(d);
-  });
+  // เรียงลำดับจากวันที่ล่าสุด
+  const sortedDays = [...dailySummaries].sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
 
-  const sortedMonths = Object.keys(monthGroups).sort().reverse();
-
-  tbody.innerHTML = sortedMonths.map(mKey => {
-    const group = monthGroups[mKey];
-    const dateObj = new Date(mKey + "-01T00:00:00");
-    const monthName = isNaN(dateObj.getTime()) ? mKey : dateObj.toLocaleDateString("th-TH", { month: "long", year: "numeric" });
-
-    return `<tr>
-      <td><b>📅 ${monthName}</b></td>
-      <td><b style="color:#d65f91">฿${group.totalSales.toLocaleString("th-TH")}</b></td>
-      <td>${group.totalOrders.toLocaleString("th-TH")} ออเดอร์</td>
-      <td>
-        <button class="btn" style="padding:6px 12px; font-size:12px" onclick="openDailyDetailModal('${mKey}')">🔍 ดูรายละเอียดรายวัน</button>
-      </td>
-    </tr>`;
-  }).join("");
-}
-
-function openDailyDetailModal(monthKey) {
-  const dateObj = new Date(monthKey + "-01T00:00:00");
-  const monthName = isNaN(dateObj.getTime()) ? monthKey : dateObj.toLocaleDateString("th-TH", { month: "long", year: "numeric" });
-  
-  document.getElementById("dailyDetailModalTitle").textContent = `สรุปยอดขายรายวัน (${monthName})`;
-  
-  const daysInMonth = dailySummaries.filter(d => d.date && d.date.startsWith(monthKey)).sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
-  const tbody = document.getElementById("dailyDetailTable");
-
-  if(daysInMonth.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#a17f90">ไม่มีข้อมูลย่อยของเดือนนี้</td></tr>';
-  } else {
-    tbody.innerHTML = daysInMonth.map(d => `<tr>
-      <td><b>${formatDate(d.date)}</b></td>
-      <td style="color:#d65f91; font-weight:bold">฿${Number(d.total_sales||0).toLocaleString("th-TH")}</td>
-      <td>${d.order_count||0} ออเดอร์</td>
-      <td>${d.top_item||"-"}</td>
-      <td>
-        <button class="btn secondary" style="padding:4px 8px; font-size:12px" onclick="viewDayItemsDetail('${d.date}')">🔍 รายการอาหาร</button>
-        <button class="btn danger" style="padding:4px 8px; font-size:12px; margin-left:4px;" onclick="deleteDailySummary(${d.id})">ลบ</button>
-      </td>
-    </tr>`).join("");
-  }
-
-  document.getElementById("dailyDetailModal").classList.add("show");
-}
-
-function closeDailyDetailModal() {
-  document.getElementById("dailyDetailModal").classList.remove("show");
+  tbody.innerHTML = sortedDays.map(d => `<tr>
+    <td><b>${formatDate(d.date)}</b></td>
+    <td style="color:#d65f91; font-weight:bold">฿${Number(d.total_sales||0).toLocaleString("th-TH")}</td>
+    <td>${d.order_count||0} ออเดอร์</td>
+    <td>${d.top_item||"-"}</td>
+    <td>
+      <button class="btn secondary" style="padding:4px 8px; font-size:12px" onclick="viewDayItemsDetail('${d.date}')">🔍 ดูรายการ</button>
+      <button class="btn danger" style="padding:4px 8px; font-size:12px; margin-left:4px;" onclick="deleteDailySummary(${d.id})">🗑️ ลบ</button>
+    </td>
+  </tr>`).join("");
 }
 
 async function deleteDailySummary(id) {
   if(confirm("ต้องการลบประวัติสรุปยอดประจำวันนี้ใช่หรือไม่?")) {
     await dbDelete('uwu_daily_summaries', id);
-    closeDailyDetailModal();
     refreshAll();
   }
 }
@@ -1413,28 +1349,34 @@ function viewDayItemsDetail(dateStr) {
   const dayOrders = completedOrders.filter(o => o.date === dateStr);
   const totalSales = dayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
 
+  document.getElementById('dayDetailModalTitle').textContent = `สรุปยอดขายวันที่ ${formatDate(dateStr)}`;
+
   let html = `
-    <h3>🔍 สรุปรายการเมนูที่ขายได้วันที่ ${formatDate(dateStr)}</h3>
-    <div style="background:#fff0f6; padding:12px; border-radius:12px; margin-bottom:15px; color:#7e5c6d; border:1px solid #f8d5e5">
-      <div>ยอดขายรวม: <b style="color:#d65f91; font-size:18px;">฿${totalSales.toLocaleString('th-TH')}</b></div>
-      <div>จำนวนออเดอร์: <b>${dayOrders.length} ออเดอร์</b></div>
+    <div style="background:#fff0f6; padding:12px; border-radius:12px; margin-bottom:15px; color:#7e5c6d; border:1px solid #f8d5e5; text-align:center;">
+      <div>ยอดขายรวม: <b style="color:#d65f91; font-size:22px;">฿${totalSales.toLocaleString('th-TH')}</b></div>
+      <div style="margin-top: 5px;">จำนวน: <b>${dayOrders.length} ออเดอร์</b></div>
     </div>
   `;
 
   if(!dayOrders.length){
-    html += '<div class="empty-order">ไม่มีออเดอร์ในวันที่เลือก</div>';
+    html += '<div class="empty-order" style="text-align:center; padding: 20px;">ไม่มีออเดอร์ในระบบสำหรับวันนี้ เหมียว~</div>';
   } else {
-    html += `<div class="selected-order-items" style="max-height:280px">`;
+    html += `<div class="selected-order-items" style="max-height:300px; overflow-y:auto;">`;
     dayOrders.forEach(o => {
-      html += `<div class="selected-order-item">
-        <div><b>ออเดอร์ ${o.id} (${o.table})</b><br><small>${o.items}</small></div>
-        <strong>฿${Number(o.total||0).toLocaleString('th-TH')}</strong>
+      html += `<div class="selected-order-item" style="display:flex; justify-content:space-between; padding: 10px; border-bottom: 1px solid #f7e7ee;">
+        <div><b>ออเดอร์ ${o.id} (${o.table})</b><br><small style="color:#a07f8e;">${o.items}</small></div>
+        <strong style="color:#d65f91;">฿${Number(o.total||0).toLocaleString('th-TH')}</strong>
       </div>`;
     });
     html += `</div>`;
   }
 
-  alert(`สรุปเมนูที่ขายได้วันที่ ${formatDate(dateStr)}\nรวมทั้งสิ้น: ฿${totalSales.toLocaleString('th-TH')} (${dayOrders.length} ออเดอร์)`);
+  document.getElementById('dayDetailContent').innerHTML = html;
+  document.getElementById('dayDetailModal').classList.add('show');
+}
+
+function closeDayDetailModal() {
+  document.getElementById('dayDetailModal').classList.remove('show');
 }
 
 function updateDash(){
